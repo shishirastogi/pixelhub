@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+*.err
+npm-debug.log*
+pnpm-debug.log*
+
+# Prisma
+packages/db/prisma/migrations/dev.db*
+
+# PixelHub watcher local state (never leaves the machine)
+.pixelhub/
+queue.db
+*.conflict-*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

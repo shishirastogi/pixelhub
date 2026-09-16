@@ -1,0 +1,36 @@
+{
+  "name": "@pixelhub/watcher",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "pixelhub-watch — the desktop agent that keeps a local project folder in sync.",
+  "bin": {
+    "pixelhub-watch": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --clean --dts",
+    "start": "tsx src/index.ts",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@pixelhub/config": "workspace:*",
+    "@pixelhub/types": "workspace:*",
+    "chokidar": "^3.6.0",
+    "commander": "^12.1.0",
+    "conf": "^13.0.0",
+    "p-queue": "^8.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsup": "^8.2.4",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

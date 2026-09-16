@@ -1,0 +1,27 @@
+{
+  "name": "@pixelhub/types",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared TypeScript types and zod contracts (API contracts) for PixelHub.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./enums": "./src/enums.ts",
+    "./contracts/*": "./src/contracts/*.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@pixelhub/config": "workspace:*",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

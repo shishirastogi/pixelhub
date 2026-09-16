@@ -1,0 +1,44 @@
+{
+  "name": "@pixelhub/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PixelHub Next.js app (UI + API routes).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0",
+    "@prisma/client": "^5.18.0",
+    "@pixelhub/ai": "workspace:*",
+    "@pixelhub/config": "workspace:*",
+    "@pixelhub/db": "workspace:*",
+    "@pixelhub/types": "workspace:*",
+    "mime-types": "^2.1.35",
+    "next": "^14.2.5",
+    "picomatch": "^4.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.33.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/mime-types": "^2.1.4",
+    "@types/picomatch": "^3.0.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.5",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

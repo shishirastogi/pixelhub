@@ -1,0 +1,822 @@
+// PixelHub database schema.
+// Spec: docs/02-database-schema.md
+// Conventions: UUID pk, createdAt/updatedAt, soft-delete via deletedAt, SCREAMING_SNAKE enums.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  CONTRIBUTOR
+  REVIEWER
+  CLIENT
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum RequirementSource {
+  MANUAL
+  AI_EXTRACTED
+}
+
+enum RequirementStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  FULFILLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum DeliverableStatus {
+  OPEN
+  SATISFIED
+}
+
+enum LinkType {
+  SATISFIES
+  SUPPORTS
+  SUPERSEDED
+}
+
+enum MatchedBy {
+  WATCHER_RULE
+  AI
+  MANUAL
+}
+
+enum BranchKind {
+  MAIN
+  CONCEPT
+  REVISION
+  EXPERIMENTAL
+}
+
+enum BranchStatus {
+  ACTIVE
+  MERGED
+  ABANDONED
+  APPROVED
+}
+
+enum FileRole {
+  SOURCE
+  EXPORT
+  DELIVERABLE
+  ASSET
+}
+
+enum FileKind {
+  SOURCE
+  EXPORT
+  DELIVERABLE
+  REFERENCE
+  BRAND_ASSET
+  BRIEF_DOC
+  OTHER
+}
+
+enum PreviewKind {
+  THUMB
+  MEDIUM
+  FULL
+}
+
+enum DesignSheetItemType {
+  IMAGE
+  URL
+  NOTE
+  COLOR
+  FILE_REF
+}
+
+enum BrandColorRole {
+  PRIMARY
+  SECONDARY
+  ACCENT
+  NEUTRAL
+  BACKGROUND
+  TEXT
+}
+
+enum BrandFontRole {
+  HEADING
+  BODY
+  MONO
+  OTHER
+}
+
+enum BrandLogoVariant {
+  PRIMARY
+  MONO
+  ICON
+  WORDMARK
+}
+
+enum BrandRuleType {
+  MIN_CLEAR_SPACE
+  MIN_SIZE
+  FORBIDDEN_COLOR
+  FORBIDDEN_FONT
+  USAGE_NOTE
+}
+
+enum Severity {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum BrandCheckType {
+  COLOR
+  FONT
+  LOGO
+  RULE
+}
+
+enum CheckStatus {
+  PASS
+  WARNING
+  FAIL
+}
+
+enum CommentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum TaskSource {
+  MANUAL
+  AI_EXTRACTED
+  COMMENT
+  AI_RECOMMENDATION
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum DecisionStatus {
+  PROPOSED
+  DECIDED
+  SUPERSEDED
+  REVISITED
+}
+
+enum AiJobType {
+  EXTRACT_REQUIREMENTS
+  GENERATE_TASKS
+  COMPARE_VERSIONS
+  BRAND_CHECK
+  MATCH_FILE
+  PROJECT_STATUS_NARRATIVE
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. Identity & Access
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  avatarUrl    String?
+  passwordHash String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  sessions         Session[]
+  memberships      ProjectMember[]
+  pairedDevices    WatcherDevice[]
+  uploadedFiles    File[]          @relation("FileUploadedBy")
+  createdVersions  Version[]       @relation("VersionCreatedBy")
+  requestedAiJobs  AiJob[]
+  assignedTasks    Task[]
+  decidedDecisions Decision[]
+  comments         Comment[]
+  activityEvents   ActivityEvent[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id              String        @id @default(uuid())
+  name            String
+  slug            String        @unique
+  description     String?
+  clientName      String?
+  deadline        DateTime?
+  status          ProjectStatus @default(ACTIVE)
+  aiEnabled       Boolean       @default(true)
+  defaultBranchId String?
+  watcherRootPath String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  members            ProjectMember[]
+  watcherDevices     WatcherDevice[]
+  defaultBranch      Branch?             @relation("ProjectDefaultBranch", fields: [defaultBranchId], references: [id], onDelete: SetNull)
+  branches           Branch[]            @relation("ProjectBranches")
+  briefs             Brief[]
+  requirements       Requirement[]
+  versionComparisons VersionComparison[]
+  files              File[]
+  designSheetItems   DesignSheetItem[]
+  brandKit           BrandKit?
+  brandCheckResults  BrandCheckResult[]
+  decisions          Decision[]
+  comments           Comment[]
+  tasks              Task[]
+  aiJobs             AiJob[]
+  activityEvents     ActivityEvent[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@index([status])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  role      Role
+  invitedBy String?
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model WatcherDevice {
+  id             String    @id @default(uuid())
+  projectId      String
+  name           String
+  tokenHash      String    @unique
+  pairedByUserId String
+  lastSeenAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pairedBy User    @relation(fields: [pairedByUserId], references: [id])
+  files    File[]
+
+  @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. Brief & Requirements
+// ─────────────────────────────────────────────────────────────
+
+model Brief {
+  id              String    @id @default(uuid())
+  projectId       String
+  title           String
+  rawText         String
+  sourceFileId    String?
+  extractedAt     DateTime?
+  extractionJobId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceFile    File?         @relation("BriefSourceFile", fields: [sourceFileId], references: [id])
+  extractionJob AiJob?        @relation("BriefExtractionJob", fields: [extractionJobId], references: [id])
+  requirements  Requirement[]
+
+  @@index([projectId])
+}
+
+model Requirement {
+  id          String            @id @default(uuid())
+  projectId   String
+  briefId     String?
+  title       String
+  description String?
+  source      RequirementSource @default(MANUAL)
+  status      RequirementStatus @default(PENDING)
+  quantity    Int               @default(1)
+  dueDate     DateTime?
+  priority    Priority          @default(MEDIUM)
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  project          Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  brief            Brief?                @relation(fields: [briefId], references: [id])
+  deliverables     Deliverable[]
+  fileLinks        RequirementFileLink[]
+  tasks            Task[]
+  designSheetItems DesignSheetItem[]
+
+  @@index([projectId, status])
+}
+
+model Deliverable {
+  id                String            @id @default(uuid())
+  requirementId     String
+  name              String
+  filePatterns      String[]
+  status            DeliverableStatus @default(OPEN)
+  satisfiedByFileId String?
+  satisfiedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  requirement     Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  satisfiedByFile File?       @relation("DeliverableSatisfiedByFile", fields: [satisfiedByFileId], references: [id])
+
+  @@index([requirementId])
+}
+
+model RequirementFileLink {
+  requirementId String
+  fileId        String
+  linkType      LinkType  @default(SATISFIES)
+  matchedBy     MatchedBy @default(MANUAL)
+  confidence    Float?
+  createdAt     DateTime  @default(now())
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  file        File        @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([requirementId, fileId])
+  @@index([fileId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. Versioning & Branches
+// ─────────────────────────────────────────────────────────────
+
+model Branch {
+  id             String       @id @default(uuid())
+  projectId      String
+  name           String
+  slug           String
+  kind           BranchKind
+  parentBranchId String?
+  headVersionId  String?
+  status         BranchStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  project            Project   @relation("ProjectBranches", fields: [projectId], references: [id], onDelete: Cascade)
+  defaultForProjects Project[] @relation("ProjectDefaultBranch")
+  parentBranch       Branch?   @relation("BranchLineage", fields: [parentBranchId], references: [id])
+  childBranches      Branch[]  @relation("BranchLineage")
+  headVersion        Version?  @relation("BranchHead", fields: [headVersionId], references: [id], onDelete: SetNull)
+  versions           Version[] @relation("BranchVersions")
+  sourceOfVersions   Version[] @relation("VersionSourceBranch")
+  files              File[]
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+}
+
+model Version {
+  id              String   @id @default(uuid())
+  branchId        String
+  number          Int
+  label           String?
+  note            String?
+  parentVersionId String?
+  sourceBranchId  String?
+  sourceVersionId String?
+  createdById     String
+  checksum        String
+  aiSummary       String?
+  createdAt       DateTime @default(now())
+
+  branch              Branch              @relation("BranchVersions", fields: [branchId], references: [id], onDelete: Cascade)
+  headOfBranches      Branch[]            @relation("BranchHead")
+  parentVersion       Version?            @relation("VersionLineage", fields: [parentVersionId], references: [id])
+  childVersions       Version[]           @relation("VersionLineage")
+  sourceBranch        Branch?             @relation("VersionSourceBranch", fields: [sourceBranchId], references: [id])
+  sourceVersion       Version?            @relation("VersionSource", fields: [sourceVersionId], references: [id])
+  derivedVersions     Version[]           @relation("VersionSource")
+  createdBy           User                @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  files               VersionFile[]
+  comparisonsAsBase   VersionComparison[] @relation("ComparisonBase")
+  comparisonsAsTarget VersionComparison[] @relation("ComparisonTarget")
+  comments            Comment[]
+  decisions           Decision[]
+
+  @@unique([branchId, number])
+  @@index([branchId])
+}
+
+model VersionFile {
+  versionId String
+  fileId    String
+  path      String
+  role      FileRole
+
+  version Version @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([versionId, fileId])
+  @@index([fileId])
+}
+
+model VersionComparison {
+  id              String   @id @default(uuid())
+  projectId       String
+  baseVersionId   String
+  targetVersionId String
+  jobId           String?
+  diffJson        Json
+  summaryMd       String?
+  createdAt       DateTime @default(now())
+
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  baseVersion   Version @relation("ComparisonBase", fields: [baseVersionId], references: [id], onDelete: Cascade)
+  targetVersion Version @relation("ComparisonTarget", fields: [targetVersionId], references: [id], onDelete: Cascade)
+  job           AiJob?  @relation("VersionComparisonJob", fields: [jobId], references: [id])
+
+  @@unique([baseVersionId, targetVersionId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. Files
+// ─────────────────────────────────────────────────────────────
+
+model File {
+  id              String    @id @default(uuid())
+  projectId       String
+  branchId        String?
+  path            String
+  fileName        String
+  extension       String
+  mimeType        String
+  sizeBytes       BigInt
+  sha256          String
+  storageKey      String
+  uploadedById    String?
+  watcherDeviceId String?
+  kind            FileKind  @default(OTHER)
+  imageMeta       Json?
+  analyzedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  project               Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch                Branch?               @relation(fields: [branchId], references: [id])
+  uploadedBy            User?                 @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+  watcherDevice         WatcherDevice?        @relation(fields: [watcherDeviceId], references: [id])
+  previews              FilePreview[]
+  versionFiles          VersionFile[]
+  requirementLinks      RequirementFileLink[]
+  satisfiedDeliverables Deliverable[]         @relation("DeliverableSatisfiedByFile")
+  briefsSourced         Brief[]               @relation("BriefSourceFile")
+  brandKitStyleGuides   BrandKit[]            @relation("BrandKitStyleGuide")
+  brandFonts            BrandFont[]           @relation("BrandFontFile")
+  brandLogos            BrandLogo[]           @relation("BrandLogoFile")
+  designSheetItems      DesignSheetItem[]
+  brandCheckResults     BrandCheckResult[]
+  comments              Comment[]
+
+  // One live row per (projectId, branchId, path) is enforced in the application layer:
+  // the files service soft-deletes the prior revision before inserting the new one.
+  // Postgres partial unique indexes (WHERE "deletedAt" IS NULL) are not expressible
+  // in the Prisma schema, and a plain @@unique would block revisions.
+  @@index([projectId, path])
+  @@index([projectId, branchId])
+  @@index([sha256])
+  @@index([projectId, extension])
+}
+
+model FilePreview {
+  id         String      @id @default(uuid())
+  fileId     String
+  kind       PreviewKind
+  storageKey String
+  width      Int
+  height     Int
+  createdAt  DateTime    @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, kind])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. Design Sheet
+// ─────────────────────────────────────────────────────────────
+
+model DesignSheetItem {
+  id                  String              @id @default(uuid())
+  projectId           String
+  type                DesignSheetItemType
+  title               String?
+  content             String?
+  fileId              String?
+  positionX           Float               @default(0)
+  positionY           Float               @default(0)
+  width               Float?
+  height              Float?
+  boardGroup          String?
+  linkedDecisionId    String?
+  linkedRequirementId String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  project             Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file                File?        @relation(fields: [fileId], references: [id])
+  linkedDecision      Decision?    @relation("DesignSheetDecision", fields: [linkedDecisionId], references: [id], onDelete: SetNull)
+  linkedRequirement   Requirement? @relation(fields: [linkedRequirementId], references: [id], onDelete: SetNull)
+  linkedFromDecisions Decision[]   @relation("DecisionDesignSheetItem")
+
+  @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. Brand Kit
+// ─────────────────────────────────────────────────────────────
+
+model BrandKit {
+  id               String   @id @default(uuid())
+  projectId        String   @unique
+  name             String
+  styleGuideFileId String?
+  guidelinesText   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  styleGuideFile File?        @relation("BrandKitStyleGuide", fields: [styleGuideFileId], references: [id])
+  colors         BrandColor[]
+  fonts          BrandFont[]
+  logos          BrandLogo[]
+  rules          BrandRule[]
+}
+
+model BrandColor {
+  id         String         @id @default(uuid())
+  brandKitId String
+  name       String
+  hex        String
+  role       BrandColorRole
+  tolerance  Int            @default(10)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+
+  @@index([brandKitId])
+}
+
+model BrandFont {
+  id         String        @id @default(uuid())
+  brandKitId String
+  family     String
+  role       BrandFontRole
+  fallbacks  String[]
+  sourceUrl  String?
+  fileId     String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+  file     File?    @relation("BrandFontFile", fields: [fileId], references: [id])
+
+  @@index([brandKitId])
+}
+
+model BrandLogo {
+  id         String           @id @default(uuid())
+  brandKitId String
+  name       String
+  variant    BrandLogoVariant
+  fileId     String
+  isCurrent  Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+  file     File     @relation("BrandLogoFile", fields: [fileId], references: [id])
+
+  @@index([brandKitId])
+}
+
+model BrandRule {
+  id         String        @id @default(uuid())
+  brandKitId String
+  ruleType   BrandRuleType
+  payload    Json
+  severity   Severity      @default(WARNING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+
+  @@index([brandKitId])
+}
+
+model BrandCheckResult {
+  id         String         @id @default(uuid())
+  projectId  String
+  fileId     String
+  jobId      String?
+  checkType  BrandCheckType
+  status     CheckStatus
+  findings   Json
+  resolvedAt DateTime?
+  createdAt  DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  job     AiJob?  @relation("BrandCheckJob", fields: [jobId], references: [id])
+
+  @@index([fileId, createdAt])
+  @@index([projectId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. Collaboration: Comments, Tasks, Decisions
+// ─────────────────────────────────────────────────────────────
+
+model Comment {
+  id              String        @id @default(uuid())
+  projectId       String
+  versionId       String?
+  fileId          String?
+  parentCommentId String?
+  authorId        String
+  body            String
+  anchorJson      Json?
+  status          CommentStatus @default(OPEN)
+  convertedTaskId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version       Version?  @relation(fields: [versionId], references: [id])
+  file          File?     @relation(fields: [fileId], references: [id])
+  parentComment Comment?  @relation("CommentThread", fields: [parentCommentId], references: [id])
+  replies       Comment[] @relation("CommentThread")
+  author        User      @relation(fields: [authorId], references: [id])
+  convertedTask Task?     @relation("CommentConverted", fields: [convertedTaskId], references: [id], onDelete: SetNull)
+  tasks         Task[]    @relation("TaskOriginComment")
+
+  @@index([projectId])
+  @@index([versionId])
+  @@index([fileId])
+}
+
+model Task {
+  id            String     @id @default(uuid())
+  projectId     String
+  title         String
+  description   String?
+  source        TaskSource @default(MANUAL)
+  status        TaskStatus @default(TODO)
+  assigneeId    String?
+  requirementId String?
+  commentId     String?
+  checklistJson Json?
+  dueDate       DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  project           Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee          User?        @relation(fields: [assigneeId], references: [id])
+  requirement       Requirement? @relation(fields: [requirementId], references: [id])
+  comment           Comment?     @relation("TaskOriginComment", fields: [commentId], references: [id], onDelete: SetNull)
+  convertedComments Comment[]    @relation("CommentConverted")
+
+  @@index([projectId, status])
+}
+
+model Decision {
+  id                String         @id @default(uuid())
+  projectId         String
+  title             String
+  decision          String
+  reason            String
+  status            DecisionStatus @default(PROPOSED)
+  versionId         String?
+  designSheetItemId String?
+  decidedById       String?
+  decidedAt         DateTime?
+  supersedesId      String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  project                Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version                Version?          @relation(fields: [versionId], references: [id])
+  designSheetItem        DesignSheetItem?  @relation("DecisionDesignSheetItem", fields: [designSheetItemId], references: [id], onDelete: SetNull)
+  linkedDesignSheetItems DesignSheetItem[] @relation("DesignSheetDecision")
+  decidedBy              User?             @relation(fields: [decidedById], references: [id])
+  supersedes             Decision?         @relation("DecisionSupersession", fields: [supersedesId], references: [id])
+  supersededBy           Decision[]        @relation("DecisionSupersession")
+
+  @@index([projectId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. AI Infrastructure
+// ─────────────────────────────────────────────────────────────
+
+model AiJob {
+  id            String      @id @default(uuid())
+  projectId     String
+  type          AiJobType
+  status        AiJobStatus @default(QUEUED)
+  inputJson     Json
+  resultJson    Json?
+  error         String?
+  model         String?
+  tokensIn      Int?
+  tokensOut     Int?
+  requestedById String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy       User?               @relation(fields: [requestedById], references: [id])
+  briefs            Brief[]             @relation("BriefExtractionJob")
+  comparisons       VersionComparison[] @relation("VersionComparisonJob")
+  brandCheckResults BrandCheckResult[]  @relation("BrandCheckJob")
+
+  @@index([projectId, status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. Activity & Analytics
+// ─────────────────────────────────────────────────────────────
+
+model ActivityEvent {
+  id         String   @id @default(uuid())
+  projectId  String
+  actorId    String?
+  type       String
+  entityType String
+  entityId   String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([type])
+}
+
+model AnalyticsSnapshot {
+  id         String   @id @default(uuid())
+  projectId  String
+  date       DateTime @db.Date
+  metrics    Json
+  computedAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date])
+}

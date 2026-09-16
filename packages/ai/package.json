@@ -1,0 +1,28 @@
+{
+  "name": "@pixelhub/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AiProvider abstraction, prompts and output parsers for PixelHub.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./provider": "./src/provider.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@pixelhub/types": "workspace:*",
+    "openai": "^4.56.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@pixelhub/config": "workspace:*",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

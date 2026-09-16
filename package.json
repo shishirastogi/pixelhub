@@ -1,0 +1,29 @@
+{
+  "name": "pixelhub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A version-controlled creative workspace for designers.",
+  "packageManager": "pnpm@9.6.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @pixelhub/db run generate",
+    "db:migrate": "pnpm --filter @pixelhub/db run migrate",
+    "db:seed": "pnpm --filter @pixelhub/db run seed",
+    "db:studio": "pnpm --filter @pixelhub/db run studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.1.2",
+    "typescript": "^5.5.4"
+  }
+}
