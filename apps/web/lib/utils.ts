@@ -36,3 +36,31 @@ export function initials(name: string): string {
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 }
+
+export function formatBytes(size: number | bigint | string | null | undefined): string {
+  if (size === null || size === undefined) return "—";
+  const value = typeof size === "bigint" ? Number(size) : typeof size === "string" ? Number(size) : size;
+  if (!Number.isFinite(value)) return "—";
+  if (value < 1024) return `${value} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let v = value;
+  let unit = -1;
+  do {
+    v /= 1024;
+    unit += 1;
+  } while (v >= 1024 && unit < units.length - 1);
+  return `${v.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+export function formatDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}

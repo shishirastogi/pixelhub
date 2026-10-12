@@ -70,14 +70,13 @@ export async function recomputeRequirementStatus(
 }
 
 /**
- * Stage A deterministic matching: glob a file against ACCEPTED requirements'
- * OPEN deliverable patterns, link + satisfy, then recompute coverage.
+ * Stage A deterministic matching: glob a file against ACCEPTED/FULFILLED
+ * requirements' open (or stale — satisfied by a superseded revision)
+ * deliverable patterns, link + satisfy, then recompute coverage.
  */
 export async function matchFile(file: MatchableFile): Promise<MatchFileResult> {
   const pathBoosted = /exports|deliverables/i.test(file.path);
-  const requirements = await repo.findAcceptedRequirementsWithOpenDeliverables(
-    file.projectId,
-  );
+  const requirements = await repo.findMatchableRequirementGroups(file.projectId);
 
   const requirementIds = new Set<string>();
   let matched = 0;

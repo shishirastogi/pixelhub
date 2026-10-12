@@ -4,47 +4,47 @@ Phased delivery aligned to the idea doc's MVP scope. "Must work" → Phase 1; "C
 
 ## 1. Phase 0 — Foundations (spike + scaffolding)
 
-- [ ] Monorepo scaffold (pnpm + Turborepo), shared `packages/types` zod contracts
-- [ ] docker-compose: Postgres, Redis, MinIO
-- [ ] Prisma schema (all tables from `02`) + migration
-- [ ] Auth (email/password + sessions), `User` + `Session`
-- [ ] `ActivityEvent` emitter + `ActivityService`
+- [x] Monorepo scaffold (pnpm + Turborepo), shared `packages/types` zod contracts
+- [x] docker-compose: Postgres, Redis, MinIO
+- [x] Prisma schema (all tables from `02`) + migration
+- [x] Auth (email/password + sessions), `User` + `Session`
+- [x] `ActivityEvent` emitter + `ActivityService`
 - [ ] CI: lint, typecheck, test, migration safety check
 
 ## 2. Phase 1 — MVP ("Must work")
 
 ### 2.1 Project core
-- [ ] Project CRUD; auto-create "Main Concept" branch + empty BrandKit on create
-- [ ] Project Pulse aggregate endpoint + dashboard page (tiles from `04 §4`)
+- [x] Project CRUD; auto-create "Main Concept" branch + empty BrandKit on create
+- [x] Project Pulse aggregate endpoint + dashboard page (tiles from `04 §4`)
 
 ### 2.2 Brief & Requirements
-- [ ] Brief save (text + uploaded file)
-- [ ] Requirement + Deliverable CRUD (manual creation with file patterns)
-- [ ] Accept/dismiss flow (UI-ready even before AI; `source=MANUAL` first)
-- [ ] Requirement coverage derivation + traceability links (`RequirementFileLink`)
+- [x] Brief save (text + uploaded file)
+- [x] Requirement + Deliverable CRUD (manual creation with file patterns)
+- [x] Accept/dismiss flow (UI-ready even before AI; `source=MANUAL` first)
+- [x] Requirement coverage derivation + traceability links (`RequirementFileLink`)
 
 ### 2.3 File watcher & auto-tracking (the core loop)
-- [ ] `pixelhub-watch` CLI: pair, scan, hash, watch, ignore rules
-- [ ] `POST /files/ingest` + pre-signed upload + confirm pipeline
+- [x] `pixelhub-watch` CLI: pair, scan, hash, watch, ignore rules
+- [x] `POST /files/ingest` + pre-signed upload + confirm pipeline
 - [ ] Preview generation (`sharp`) + `File.imageMeta`
-- [ ] Stage A deterministic matcher → install `package.json` configurable action for auto-fulfilled deliverables
-- [ ] Pulse live updates (deliverable 2/3 → 3/3 ✓)
+- [x] Stage A deterministic matcher → auto-fulfilled deliverables
+- [x] Pulse live updates (deliverable 2/3 → 3/3 ✓)
 
 ### 2.4 Versioning & branching (basic)
-- [ ] Branch CRUD (kinds, parent), switch
-- [ ] Snapshot version + checksum dedupe
-- [ ] Version timeline + detail view
-- [ ] Adopt-into-main (merge) with file-picker conflict UI
-- [ ] Mechanical comparison (files added/removed/modified + color/typography facets from imageMeta)
+- [x] Branch CRUD (kinds, parent), switch
+- [x] Snapshot version + checksum dedupe
+- [x] Version timeline + detail view
+- [x] Adopt-into-main (merge) with file-picker conflict UI
+- [x] Mechanical comparison (files added/removed/modified + color/typography facets from imageMeta)
 
 ### 2.5 Brand kit + checks (simple)
-- [ ] BrandKit CRUD (colors/fonts/logos/rules)
+- [x] BrandKit CRUD (colors/fonts/logos/rules)
 - [ ] Deterministic color ΔE check + logo/font semantic check via AI
-- [ ] `BrandCheckResult` list on Brand Kit page + Pulse "needs attention"
+- [x] `BrandCheckResult` list on Brand Kit page + Pulse "needs attention"
 
 ### 2.6 Minimal AI tie-in (small, decoupled)
-- [ ] `AiProvider` abstraction + `AiJob` lifecycle (openai impl)
-- [ ] `EXTRACT_REQUIREMENTS` (PENDING proposals) — proves the proposal/acceptance loop end-to-end
+- [x] `AiProvider` abstraction + `AiJob` lifecycle (openai impl)
+- [x] `EXTRACT_REQUIREMENTS` (PENDING proposals) — proves the proposal/acceptance loop end-to-end
 
 **Phase 1 exit criteria:** a designer creates a project, pastes a brief, sets deliverables with patterns, pairs a folder, drops files, watches requirements flip to fulfilled, snapshots versions, and sees brand inconsistencies flagged.
 

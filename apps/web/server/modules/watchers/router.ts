@@ -1,5 +1,5 @@
 import { exchangeWatcherSchema } from "@pixelhub/types/contracts/watchers";
-import { OWNER_ONLY, authorizeProject } from "../../auth/permissions";
+import { ALL_ROLES, OWNER_ONLY, authorizeProject } from "../../auth/permissions";
 import { requireUser } from "../../auth/session";
 import { requireWatcher } from "../../auth/watcher";
 import { parseBody, type RouteCtx } from "../../http";
@@ -9,6 +9,12 @@ export async function pair(ctx: RouteCtx<{ id: string }>) {
   const user = await requireUser(ctx.req);
   const { project } = await authorizeProject(user.id, ctx.params.id, OWNER_ONLY);
   return service.createPairingCode(project, user.id);
+}
+
+export async function list(ctx: RouteCtx<{ id: string }>) {
+  const user = await requireUser(ctx.req);
+  const { project } = await authorizeProject(user.id, ctx.params.id, ALL_ROLES);
+  return service.listWatcherDevices(project.id);
 }
 
 export async function exchange(ctx: RouteCtx) {

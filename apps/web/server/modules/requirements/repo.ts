@@ -21,13 +21,33 @@ export function findRequirementById(id: string) {
   });
 }
 
-export function findAcceptedRequirementsWithOpenDeliverables(
+/**
+ * Requirements that can still be matched: ACCEPTED/FULFILLED with deliverables
+ * that are either open or satisfied by a stale (soft-deleted) file revision.
+ */
+export function findMatchableRequirementGroups(
   projectId: string,
   db: Db = prisma,
 ) {
   return db.requirement.findMany({
-    where: { projectId, deletedAt: null, status: "ACCEPTED" },
-    include: { deliverables: { where: { status: "OPEN" } } },
+    where: {
+      projectId,
+      deletedAt: null,
+      status: { in: ["ACCEPTED", "FULFILLED"] },
+    },
+    include: {
+      deliverables: {
+        where: {
+          OR: [
+            { status: "OPEN" },
+            {
+              status: "SATISFIED",
+              satisfiedByFile: { deletedAt: { not: null } },
+            },
+          ],
+        },
+      },
+    },
   });
 }
 

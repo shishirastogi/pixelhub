@@ -27,7 +27,14 @@ interface PairingEntry {
 }
 
 // TODO: move pairing codes to Redis so they survive restarts / multi-instance deploys.
-const pairingCodes = new Map<string, PairingEntry>();
+// globalThis keeps one map per dev server process — Next.js otherwise evaluates
+// this module once per route, so pair/ and exchange/ would not share state.
+const globalForPairing = globalThis as unknown as {
+  pairingCodes: Map<string, PairingEntry> | undefined;
+};
+const pairingCodes =
+  globalForPairing.pairingCodes ?? new Map<string, PairingEntry>();
+globalForPairing.pairingCodes = pairingCodes;
 
 function generatePairingCode(): string {
   let code = "";
@@ -89,6 +96,10 @@ export async function getWatcherConfig(project: Project) {
     ignoreRules: [...DEFAULT_IGNORE_RULES],
     manifest,
   };
+}
+
+export async function listWatcherDevices(projectId: string) {
+  return repo.listDevicesForProject(projectId);
 }
 
 export async function revokeWatcher(userId: string, watcherId: string) {

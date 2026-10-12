@@ -12,6 +12,7 @@ const TABS = [
   { label: "Brand Kit", segment: "brand-kit" },
   { label: "Files", segment: "files" },
   { label: "Tasks", segment: "tasks" },
+  { label: "Settings", segment: "settings" },
 ] as const;
 
 export function ProjectTabs({ slug }: { slug: string }) {

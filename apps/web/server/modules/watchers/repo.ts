@@ -25,3 +25,11 @@ export function listManifestFiles(projectId: string, branchId: string | null) {
     orderBy: { path: "asc" },
   });
 }
+
+export function listDevicesForProject(projectId: string) {
+  return prisma.watcherDevice.findMany({
+    where: { projectId, revokedAt: null },
+    select: { id: true, name: true, createdAt: true, lastSeenAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
