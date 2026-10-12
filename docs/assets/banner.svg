@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" role="img" aria-label="PixelHub — a version-controlled creative workspace for designers">
+  <defs>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#1e293b"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0f172a" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#0f172a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="rose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb7185"/>
+      <stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6ee7b7"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="280" fill="#0f172a"/>
+  <rect width="1200" height="280" fill="url(#dots)"/>
+  <rect width="1200" height="280" fill="url(#fade)"/>
+
+  <!-- pixel mark -->
+  <g transform="translate(72,64)">
+    <rect x="0" y="0" width="56" height="56" rx="12" fill="url(#rose)"/>
+    <rect x="64" y="0" width="56" height="56" rx="12" fill="#334155"/>
+    <rect x="0" y="64" width="56" height="56" rx="12" fill="#334155"/>
+    <rect x="64" y="64" width="56" height="56" rx="12" fill="url(#sky)" opacity="0.9"/>
+    <rect x="28" y="28" width="16" height="16" rx="4" fill="#0f172a"/>
+    <rect x="92" y="28" width="16" height="16" rx="4" fill="#0f172a" opacity="0.55"/>
+    <rect x="28" y="92" width="16" height="16" rx="4" fill="#0f172a" opacity="0.55"/>
+    <rect x="92" y="92" width="16" height="16" rx="4" fill="#0f172a"/>
+  </g>
+
+  <!-- pulse line -->
+  <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <polyline points="868,168 920,168 950,128 982,208 1012,146 1042,168 1150,168" stroke="#e11d48" stroke-width="4" opacity="0.85"/>
+    <polyline points="1000,214 1042,214 1064,188 1084,232 1104,214 1150,214" stroke="#38bdf8" stroke-width="3" opacity="0.55"/>
+  </g>
+  <circle cx="868" cy="168" r="5" fill="url(#emerald)"/>
+  <circle cx="1042" cy="168" r="5" fill="url(#amber)"/>
+  <circle cx="1150" cy="168" r="5" fill="#e11d48"/>
+
+  <text x="248" y="146" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="66" font-weight="700" fill="#f8fafc" letter-spacing="-1.5">PixelHub</text>
+  <text x="252" y="190" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="21" fill="#94a3b8">A version-controlled creative workspace for designers</text>
+  <text x="252" y="236" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#64748b">briefs · requirements · auto-tracked deliverables · branches &amp; versions · brand checks · AI</text>
+</svg>
