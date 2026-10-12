@@ -94,21 +94,21 @@ Every project page lives under `/p/<slug>` and shares a header with the branch r
 ```mermaid
 flowchart LR
   subgraph Clients
-    Browser["🖥️ Designer browser<br/>Next.js App Router")
-    WatchCLI["🛰 pixelhub-watch CLI<br/>paired folder agent"]
+    Browser["Designer browser<br/>Next.js App Router"]
+    WatchCLI["pixelhub-watch CLI<br/>paired folder agent"]
   end
 
-  subgraph Web["⚙️ apps/web — Next.js 14"]
-    API["🔌 REST API<br/>/api/v1"]
-    Matcher["🎯 Auto-matcher<br/>deterministic glob rules"]
-    AIJobs["🤖 AiJob runner<br/>in-process · BullMQ-ready"]
-    Preview["🖼️ Preview / metadata<br/>sharp pipeline"]
+  subgraph Web["apps/web - Next.js 14"]
+    API["REST API<br/>/api/v1"]
+    Matcher["Auto-matcher<br/>deterministic glob rules"]
+    AIJobs["AiJob runner<br/>in-process, BullMQ-ready"]
+    Preview["Preview + metadata<br/>sharp pipeline"]
   end
 
-  DB[("🐘 PostgreSQL<br/>via Prisma")]
-  Redis[("⚡ Redis<br/>queues · cache")]
-  Storage[("🪣 MinIO / S3<br/>content-addressed blobs")]
-  OpenAI["🤖 OpenAI<br/>gpt-4o · gpt-4o-mini"]
+  DB[("PostgreSQL<br/>via Prisma")]
+  Redis[("Redis<br/>queues, cache")]
+  Storage[("MinIO / S3<br/>content-addressed blobs")]
+  OpenAI["OpenAI<br/>gpt-4o, gpt-4o-mini"]
 
   Browser --> API
   WatchCLI -->|"Bearer watcher token"| API
@@ -127,19 +127,19 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    participant D as 🎨 Designer
-    participant W as 🛰 pixelhub-watch
-    participant A as ⚙️ PixelHub API
-    participant S as 🪣 Object storage
+    participant D as Designer
+    participant W as pixelhub-watch
+    participant A as PixelHub API
+    participant S as Object storage
 
     D->>W: Drops instagram_post_03.png into the watched folder
     W->>W: SHA-256 hash + 2s debounce
-    W->>A: POST /files/ingest { path, sha256, size }
+    W->>A: POST /files/ingest with path, sha256, size
     A->>A: Glob-match filename against deliverable patterns
     A-->>W: uploadUrls for new blobs
     W->>S: PUT presigned upload
-    A->>A: Deliverable → SATISFIED · requirement recomputes
-    A-->>D: Pulse flips 2/3 → 3/3 ✓ · activity logged
+    A->>A: Deliverable marked SATISFIED, requirement recomputes
+    A-->>D: Pulse flips 2/3 to 3/3, activity logged
 ```
 
 ### Branching model
