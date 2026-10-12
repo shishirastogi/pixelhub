@@ -13,18 +13,28 @@ program
 program
   .command("pair")
   .description("Pair this folder using an 8-character code from the web UI")
-  .action(async () => {
-    await runPair();
+  .option("-s, --server <url>", "PixelHub server URL")
+  .option("-c, --code <code>", "pairing code (skip the prompt)")
+  .option("-r, --root <path>", "folder to watch", process.cwd())
+  .option("-n, --name <name>", "device name")
+  .action(async (options) => {
+    await runPair({
+      serverUrl: options.server,
+      code: options.code,
+      root: options.root,
+      deviceName: options.name,
+    });
   });
 
 program
   .command("start", { isDefault: true })
   .description("Watch the current folder and sync changes to PixelHub")
-  .action(async () => {
-    await startWatching({ root: process.cwd() });
+  .option("-r, --root <path>", "folder to watch", process.cwd())
+  .action(async (options) => {
+    await startWatching({ root: options.root });
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });

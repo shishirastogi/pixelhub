@@ -8,7 +8,9 @@
     "pixelhub-watch": "./dist/index.js"
   },
   "main": "./dist/index.js",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --clean --dts",
@@ -23,11 +25,15 @@
     "chokidar": "^3.6.0",
     "commander": "^12.1.0",
     "conf": "^13.0.0",
+    "mime-types": "^2.1.35",
     "p-queue": "^8.0.1",
+    "picomatch": "^4.0.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/mime-types": "^2.1.4",
     "@types/node": "^20.14.0",
+    "@types/picomatch": "^3.0.1",
     "tsup": "^8.2.4",
     "tsx": "^4.16.0",
     "typescript": "^5.5.4",

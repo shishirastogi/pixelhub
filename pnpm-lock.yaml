@@ -35,16 +35,28 @@ importers:
       conf:
         specifier: ^13.0.0
         version: 13.1.0
+      mime-types:
+        specifier: ^2.1.35
+        version: 2.1.35
       p-queue:
         specifier: ^8.0.1
         version: 8.1.1
+      picomatch:
+        specifier: ^4.0.2
+        version: 4.0.7
       zod:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      '@types/mime-types':
+        specifier: ^2.1.4
+        version: 2.1.4
       '@types/node':
         specifier: ^20.14.0
         version: 20.19.43
+      '@types/picomatch':
+        specifier: ^3.0.1
+        version: 3.0.2
       tsup:
         specifier: ^8.2.4
         version: 8.5.1(jiti@1.21.7)(postcss@8.5.28)(tsx@4.23.13)(typescript@5.9.3)
