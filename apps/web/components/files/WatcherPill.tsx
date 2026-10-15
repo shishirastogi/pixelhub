@@ -70,17 +70,17 @@ export default function WatcherPill({
     .reduce<number>((a, b) => Math.max(a, b), 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center gap-2.5 text-xs">
       <span
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${
+        className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-medium shadow-pill ${
           devices.length > 0
-            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-            : "border-neutral-200 bg-white text-neutral-500"
+            ? "border-[#141413]/15 bg-[#141413] text-white"
+            : "border-[#EBE7DF] bg-white text-[#6B6860]"
         }`}
       >
         <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            devices.length > 0 ? "bg-emerald-500" : "bg-neutral-300"
+          className={`h-2 w-2 rounded-full ${
+            devices.length > 0 ? "bg-[#9FE830]" : "bg-[#D5CFC2]"
           }`}
         />
         {devices.length > 0 ? (
@@ -90,7 +90,7 @@ export default function WatcherPill({
             {lastSeen > 0 ? ` · ${timeAgo(new Date(lastSeen))}` : ""}
           </span>
         ) : (
-          <span>Not watching — pair a folder to auto-track files</span>
+          <span>Folder Watcher Inactive — pair a folder to auto-sync</span>
         )}
       </span>
 
@@ -109,36 +109,36 @@ export default function WatcherPill({
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Watch this project folder"
+        title="Pair Local Design Folder"
         width="max-w-xl"
       >
         <div className="space-y-4 text-sm">
-          <p className="text-neutral-600">
-            Run the PixelHub watcher in your local project folder. It hashes
-            new/changed files and syncs them — matching deliverables
-            auto-satisfy requirements.
+          <p className="text-xs leading-relaxed text-[#6B6860]">
+            Run the PixelHub watcher in your local project folder. It SHA-256
+            hashes new or modified exports and syncs them — matching
+            deliverables automatically flip to fulfilled.
           </p>
 
-          <div className="rounded-lg bg-neutral-50 p-3">
-            <p className="mb-2 font-mono text-xs text-neutral-500">
-              1. Install & pair
+          <div className="rounded-2xl bg-[#FAF8F4] p-4">
+            <p className="mb-2 font-mono text-xs text-[#6B6860]">
+              1. Install & pair agent
             </p>
-            <pre className="overflow-x-auto rounded bg-neutral-900 p-3 font-mono text-xs text-neutral-100">
+            <pre className="overflow-x-auto rounded-xl bg-[#141413] p-3.5 font-mono text-xs text-white">
               {`npx pixelhub-watch pair
 # server: http://localhost:3000
-# paste the code below when asked`}
+# paste the 8-character pairing code below`}
             </pre>
             {code ? (
-              <div className="mt-3 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-3">
-                <span className="font-mono text-2xl font-semibold tracking-[0.2em] text-rose-700">
+              <div className="mt-3 flex items-center justify-between rounded-2xl border border-[#141413]/15 bg-[#9FE830]/25 p-3.5">
+                <span className="font-mono text-2xl font-bold tracking-[0.2em] text-[#141413]">
                   {code}
                 </span>
                 <Button
                   size="sm"
-                  variant="secondary"
+                  variant="primary"
                   onClick={() => copy(code)}
                 >
-                  Copy
+                  Copy Code
                 </Button>
               </div>
             ) : (
@@ -152,14 +152,14 @@ export default function WatcherPill({
               </Button>
             )}
             {code && expiresAt ? (
-              <p className="mt-2 text-xs text-neutral-400">
+              <p className="mt-2 text-xs text-[#6B6860]">
                 Code expires{" "}
                 {timeAgo(new Date(expiresAt)).replace("ago", "from now")}
               </p>
             ) : null}
-            <p className="mt-2 font-mono text-xs text-neutral-500">
-              2. Then run <code>pixelhub-watch</code> in{" "}
-              <code>{projectSlug}/</code> to start watching.
+            <p className="mt-2 font-mono text-xs text-[#6B6860]">
+              2. Run <code>pixelhub-watch</code> in{" "}
+              <code>{projectSlug}/</code> to begin live sync.
             </p>
           </div>
 

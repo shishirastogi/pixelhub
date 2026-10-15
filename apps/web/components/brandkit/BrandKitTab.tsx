@@ -536,19 +536,19 @@ export default function BrandKitTab({
                         `file:${logo.fileId.slice(0, 8)}`}
                     </span>
                     <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                      <input
-                        type="checkbox"
-                        checked={logo.isCurrent}
-                        onChange={(e) => {
-                          const next = [...kit.logos];
-                          next[index] = {
-                            ...logo,
-                            isCurrent: e.target.checked,
-                          };
-                          updateKit("logos", next);
-                        }}
-                        className="h-3.5 w-3.5 accent-rose-600"
-                      />
+                        <input
+                          type="checkbox"
+                          checked={logo.isCurrent}
+                          onChange={(e) => {
+                            const next = [...kit.logos];
+                            next[index] = {
+                              ...logo,
+                              isCurrent: e.target.checked,
+                            };
+                            updateKit("logos", next);
+                          }}
+                          className="h-3.5 w-3.5 accent-[#141413]"
+                        />
                       Current
                     </label>
                     <Button
@@ -684,12 +684,12 @@ export default function BrandKitTab({
       <Card>
         <CardTitle
           hint={
-            <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+            <label className="flex items-center gap-1.5 text-xs text-[#6B6860]">
               <input
                 type="checkbox"
                 checked={showResolved}
                 onChange={(e) => setShowResolved(e.target.checked)}
-                className="h-3.5 w-3.5 accent-rose-600"
+                className="h-3.5 w-3.5 accent-[#141413]"
               />
               Show resolved
             </label>

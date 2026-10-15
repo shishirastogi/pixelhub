@@ -30,22 +30,24 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className={`w-full ${width} max-h-[90vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl`}
+        className={`w-full ${width} max-h-[90vh] overflow-y-auto rounded-[28px] border border-[#EBE7DF] bg-white p-6 shadow-float`}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
+        <div className="mb-5 flex items-center justify-between border-b border-[#F2EFE8] pb-3.5">
+          <h2 className="font-serif text-2xl font-normal text-[#141413]">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F4F2ED] text-[#6B6860] transition hover:bg-[#EAE5DC] hover:text-[#141413]"
             aria-label="Close"
           >
             ×
@@ -53,7 +55,9 @@ export function Modal({
         </div>
         {children}
         {footer ? (
-          <div className="mt-5 flex justify-end gap-2">{footer}</div>
+          <div className="mt-6 flex justify-end gap-2.5 border-t border-[#F2EFE8] pt-4">
+            {footer}
+          </div>
         ) : null}
       </div>
     </div>

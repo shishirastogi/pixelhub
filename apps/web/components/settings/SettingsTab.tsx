@@ -182,17 +182,17 @@ export default function SettingsTab({
               placeholder="What is this project about?"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <label className="flex items-center gap-2 text-sm text-[#141413]">
             <input
               type="checkbox"
               checked={form.aiEnabled}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, aiEnabled: e.target.checked }))
               }
-              className="h-4 w-4 accent-rose-600"
+              className="h-4 w-4 accent-[#141413]"
             />
             AI features enabled
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-[#6B6860]">
               (requirement extraction, brand checks, comparisons)
             </span>
           </label>

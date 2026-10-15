@@ -271,14 +271,21 @@ export default function DesignSheetTab({
                       <p className="whitespace-pre-wrap text-xs text-neutral-600">
                         {item.content}
                       </p>
+                    ) : item.fileId ? (
+                      <div className="space-y-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/v1/files/${item.fileId}/preview`}
+                          alt={item.title ?? "Project file"}
+                          className="h-36 w-full rounded-xl border border-[#EBE7DF] bg-[#141413] object-cover"
+                        />
+                        <p className="text-[11px] text-[#6B6860]">
+                          Attached project asset · #{projectSlug}
+                        </p>
+                      </div>
                     ) : (
                       <p className="text-xs text-neutral-500">
-                        {item.fileId
-                          ? `file:${item.fileId.slice(0, 8)} — open in Files`
-                          : "No file attached"}
-                        <span className="ml-2 text-neutral-400">
-                          (#{projectSlug})
-                        </span>
+                        No file attached
                       </p>
                     )}
                   </div>

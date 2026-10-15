@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, CardTitle } from "@/components/ui";
 
 interface NarrativeResult {
   narrative?: string;
@@ -17,7 +16,13 @@ interface AiJob {
   error?: string | null;
 }
 
-export function AiNarrativeTile({ projectId }: { projectId: string }) {
+export function AiNarrativeTile({
+  projectId,
+  defaultSummary,
+}: {
+  projectId: string;
+  defaultSummary?: string;
+}) {
   const [job, setJob] = useState<AiJob | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,64 +59,74 @@ export function AiNarrativeTile({ projectId }: { projectId: string }) {
   const result = job?.resultJson ?? null;
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardTitle
-        hint={
-          <button
-            type="button"
-            onClick={run}
-            disabled={busy}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-60"
-          >
-            {busy ? "Working…" : "Refresh with AI"}
-          </button>
-        }
-      >
-        AI health narrative
-      </CardTitle>
+    <div className="flex flex-1 flex-col justify-between rounded-[24px] border border-sky-200/80 bg-ai-sky p-5 shadow-card">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/80 text-[#141413] shadow-sm">
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              className="h-3.5 w-3.5"
+              stroke="currentColor"
+              strokeWidth="1.6"
+            >
+              <path
+                d="M2.5 12.5V3.5M2.5 12.5H13.5M5.5 9.5 8 7l2.2 2 2.8-3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <h3 className="font-serif text-[21px] font-normal text-[#141413]">
+            AI Analytics Assistant
+          </h3>
+        </div>
 
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy}
+          className="rounded-full border border-white/80 bg-white/90 px-3.5 py-1.5 text-xs font-medium text-[#141413] shadow-pill transition hover:bg-white disabled:opacity-60"
+        >
+          {busy ? "Analyzing…" : "Ask Assistant"}
+        </button>
+      </div>
 
-      {busy && !job ? (
-        <p className="text-sm text-neutral-500">
-          Asking the assistant where this project stands…
-        </p>
-      ) : null}
+      {/* Frosted Glass Chat Container (RevenueX style) */}
+      <div className="space-y-2.5 rounded-2xl border border-white/85 bg-white/60 p-3.5 backdrop-blur-md">
+        <div className="w-fit rounded-xl bg-white px-3.5 py-2 text-xs font-medium text-[#141413] shadow-sm">
+          What insights are you looking for?
+        </div>
 
-      {job?.status === "FAILED" ? (
-        <p className="text-sm text-rose-600">
-          {job.error ?? "The AI request failed."}
-        </p>
-      ) : null}
-
-      {result?.narrative ? (
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed text-neutral-700">
-            {result.narrative}
-          </p>
-          {result.suggestedNextActions && result.suggestedNextActions.length > 0 ? (
-            <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400">
-                Suggested next
-              </p>
-              <ul className="list-disc space-y-1 pl-4 text-sm text-neutral-600">
-                {result.suggestedNextActions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
+        <div className="rounded-xl bg-white/95 px-3.5 py-2.5 text-xs leading-relaxed text-[#57544E] shadow-sm">
+          {busy && !job ? (
+            <span>Synthesizing live deliverable & version narrative…</span>
+          ) : error ? (
+            <span className="text-rose-600">{error}</span>
+          ) : job?.status === "FAILED" ? (
+            <span className="text-rose-600">
+              {job.error ?? "AI narrative requires OPENAI_API_KEY."}
+            </span>
+          ) : result?.narrative ? (
+            <div className="space-y-2">
+              <p>{result.narrative}</p>
+              {result.suggestedNextActions &&
+              result.suggestedNextActions.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-4 text-[11px] text-[#141413]">
+                  {result.suggestedNextActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
-          ) : null}
+          ) : (
+            <span>
+              {defaultSummary ??
+                "Your project state is derived deterministically from watched files. Click “Ask Assistant” for an AI status narrative."}
+            </span>
+          )}
         </div>
-      ) : null}
-
-      {!busy && !job && !error ? (
-        <div className="space-y-2">
-          <p className="text-sm text-neutral-500">
-            Generate a plain-English summary of project status.
-          </p>
-          <Badge tone="neutral">Requires OPENAI_API_KEY</Badge>
-        </div>
-      ) : null}
-    </Card>
+      </div>
+    </div>
   );
 }

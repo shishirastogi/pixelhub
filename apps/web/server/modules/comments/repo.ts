@@ -2,7 +2,14 @@ import type { Prisma } from "@prisma/client";
 import { prisma, type Db } from "../../db";
 
 const authorSelect = {
-  select: { id: true, name: true, avatarUrl: true },
+  select: {
+    id: true,
+    name: true,
+    email: true,
+    accountType: true,
+    company: true,
+    avatarUrl: true,
+  },
 } as const;
 
 const fileSelect = {
@@ -15,9 +22,18 @@ const fileSelect = {
   },
 } as const;
 
+const versionSelect = {
+  select: {
+    id: true,
+    number: true,
+    label: true,
+  },
+} as const;
+
 const commentInclude = {
   author: authorSelect,
   file: fileSelect,
+  version: versionSelect,
 };
 
 export function findVersionWithProject(id: string) {
@@ -52,6 +68,23 @@ export function findCommentsForVersion(versionId: string) {
   return prisma.comment.findMany({
     where: { versionId },
     orderBy: { createdAt: "asc" },
+    include: commentInclude,
+  });
+}
+
+export function findCommentsForFile(fileId: string) {
+  return prisma.comment.findMany({
+    where: { fileId },
+    orderBy: { createdAt: "asc" },
+    include: commentInclude,
+  });
+}
+
+export function findCommentsForProject(projectId: string) {
+  return prisma.comment.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "desc" },
+    take: 50,
     include: commentInclude,
   });
 }

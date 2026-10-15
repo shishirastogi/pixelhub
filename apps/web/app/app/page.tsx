@@ -1,77 +1,114 @@
-import Link from "next/link";
-import { Badge, Card } from "@/components/ui";
-import { LogoutButton } from "@/components/logout-button";
+import { StudioPortalDashboard } from "@/components/studio-portal-dashboard";
 import { requireCurrentUser } from "@/server/auth/session";
-import { listProjects } from "@/server/modules/projects/service";
-import { formatDate } from "@/lib/utils";
+import {
+  listProjects,
+  listUserInvitesAndPortalData,
+} from "@/server/modules/projects/service";
+
+export const dynamic = "force-dynamic";
 
 export default async function MyProjectsPage() {
   const user = await requireCurrentUser();
-  const projects = await listProjects(user.id);
+  const [projects, portalData] = await Promise.all([
+    listProjects(user.id),
+    listUserInvitesAndPortalData(user.id),
+  ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">My Projects</h1>
-          <p className="text-sm text-neutral-500">Signed in as {user.email}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/app/new"
-            className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700"
-          >
-            + New Project
-          </Link>
-          <LogoutButton />
-        </div>
-      </header>
-
-      {projects.length === 0 ? (
-        <Card className="text-center">
-          <p className="text-neutral-600">No projects yet.</p>
-          <Link
-            href="/app/new"
-            className="mt-3 inline-block text-sm font-medium text-rose-600"
-          >
-            Create your first project →
-          </Link>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <Link key={project.id} href={`/p/${project.slug}`}>
-              <Card className="h-full transition hover:border-rose-300 hover:shadow-md">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <h2 className="font-medium">{project.name}</h2>
-                  <Badge tone="info">{project.role}</Badge>
-                </div>
-                <p className="text-sm text-neutral-500">
-                  {project.clientName ?? "No client"}
-                </p>
-                <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <dt className="text-neutral-500">Deadline</dt>
-                    <dd>{formatDate(project.deadline)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Files</dt>
-                    <dd>{project._count.files}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Requirements</dt>
-                    <dd>{project._count.requirements}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-neutral-500">Branch</dt>
-                    <dd>{project.defaultBranch?.name ?? "—"}</dd>
-                  </div>
-                </dl>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+    <StudioPortalDashboard
+      user={{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        accountType: user.accountType,
+        company: user.company,
+        title: user.title,
+      }}
+      projects={projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        clientName: p.clientName,
+        description: p.description,
+        deadline: p.deadline ? p.deadline.toISOString() : null,
+        status: p.status,
+        role: p.role,
+        defaultBranch: p.defaultBranch
+          ? { id: p.defaultBranch.id, name: p.defaultBranch.name }
+          : null,
+        counts: {
+          files: p._count.files,
+          requirements: p._count.requirements,
+          members: p._count.members,
+        },
+        permissions: p.permissions,
+      }))}
+      receivedInvites={portalData.receivedInvites.map((inv) => ({
+        id: inv.id,
+        projectId: inv.projectId,
+        email: inv.email,
+        direction: inv.direction,
+        role: inv.role,
+        status: inv.status,
+        message: inv.message,
+        canViewFiles: inv.canViewFiles,
+        canDownloadFiles: inv.canDownloadFiles,
+        canViewBrief: inv.canViewBrief,
+        canComment: inv.canComment,
+        canApproveVersions: inv.canApproveVersions,
+        createdAt: inv.createdAt.toISOString(),
+        project: {
+          id: inv.project.id,
+          name: inv.project.name,
+          slug: inv.project.slug,
+          clientName: inv.project.clientName,
+          description: inv.project.description,
+        },
+        invitedBy: inv.invitedBy ?? null,
+      }))}
+      sentRequests={portalData.sentRequests.map((req) => ({
+        id: req.id,
+        projectId: req.projectId,
+        email: req.email,
+        direction: req.direction,
+        role: req.role,
+        status: req.status,
+        message: req.message,
+        canViewFiles: req.canViewFiles,
+        canDownloadFiles: req.canDownloadFiles,
+        canViewBrief: req.canViewBrief,
+        canComment: req.canComment,
+        canApproveVersions: req.canApproveVersions,
+        createdAt: req.createdAt.toISOString(),
+        project: {
+          id: req.project.id,
+          name: req.project.name,
+          slug: req.project.slug,
+          clientName: req.project.clientName,
+          description: req.project.description,
+        },
+      }))}
+      incomingRequests={portalData.incomingRequests.map((req) => ({
+        id: req.id,
+        projectId: req.projectId,
+        email: req.email,
+        direction: req.direction,
+        role: req.role,
+        status: req.status,
+        message: req.message,
+        canViewFiles: req.canViewFiles,
+        canDownloadFiles: req.canDownloadFiles,
+        canViewBrief: req.canViewBrief,
+        canComment: req.canComment,
+        canApproveVersions: req.canApproveVersions,
+        createdAt: req.createdAt.toISOString(),
+        project: {
+          id: req.project.id,
+          name: req.project.name,
+          slug: req.project.slug,
+        },
+        user: req.user ?? null,
+      }))}
+    />
   );
 }

@@ -30,7 +30,13 @@ interface VersionDiffJson {
   ai?: {
     summary?: string;
     designerEnglish?: string;
-    changes?: Array<{ title?: string; description?: string }>;
+    changes?: Array<{
+      dimension?: string;
+      finding?: string;
+      impact?: string;
+      title?: string;
+      description?: string;
+    }>;
   };
 }
 
@@ -88,7 +94,7 @@ function VersionSelect({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none transition focus:border-rose-500"
+      className="w-full rounded-xl border border-[#E6E1D6] bg-[#FCFBF9] px-3.5 py-2.5 text-sm text-[#141413] outline-none transition focus:border-[#7C3AED] focus:bg-white"
     >
       <option value="">{placeholder}</option>
       {Array.from(branches.entries()).map(([branchId, group]) => (
@@ -282,17 +288,17 @@ export default function CompareView({
             ) : null}
           </div>
 
-          <div className="flex gap-1 border-b border-neutral-200">
+          <div className="flex gap-1.5">
             {TABS.map((entry) => (
               <button
                 key={entry.id}
                 type="button"
                 onClick={() => setTab(entry.id)}
                 className={cn(
-                  "-mb-px border-b-2 px-3 py-2 text-sm transition",
+                  "rounded-full border px-4 py-1.5 text-xs font-medium transition",
                   tab === entry.id
-                    ? "border-rose-600 font-medium text-rose-700"
-                    : "border-transparent text-neutral-500 hover:text-neutral-800",
+                    ? "border-[#141413] bg-[#141413] text-white shadow-pill"
+                    : "border-[#EBE7DF] bg-white text-[#6B6860] hover:bg-[#F3F1EC] hover:text-[#141413]",
                 )}
               >
                 {entry.label}
@@ -458,16 +464,36 @@ export default function CompareView({
                     {diff.ai.changes.map((change, index) => (
                       <li
                         key={index}
-                        className="rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                        className="rounded-xl border border-[#EBE7DF] bg-[#FAF8F4] px-3.5 py-2.5 text-xs"
                       >
-                        {change.title ? (
-                          <p className="font-medium text-neutral-800">
-                            {change.title}
-                          </p>
-                        ) : null}
-                        {change.description ? (
-                          <p className="text-neutral-600">
-                            {change.description}
+                        <div className="mb-1 flex items-center gap-2">
+                          {change.dimension ? (
+                            <Badge tone="violet">
+                              {change.dimension.toUpperCase()}
+                            </Badge>
+                          ) : null}
+                          {change.impact ? (
+                            <Badge
+                              tone={
+                                change.impact === "high"
+                                  ? "danger"
+                                  : change.impact === "medium"
+                                    ? "warning"
+                                    : "neutral"
+                              }
+                            >
+                              {change.impact} impact
+                            </Badge>
+                          ) : null}
+                          {change.title ? (
+                            <span className="font-semibold text-[#141413]">
+                              {change.title}
+                            </span>
+                          ) : null}
+                        </div>
+                        {change.finding || change.description ? (
+                          <p className="text-[#57544E]">
+                            {change.finding ?? change.description}
                           </p>
                         ) : null}
                       </li>

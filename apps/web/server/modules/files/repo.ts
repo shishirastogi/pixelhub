@@ -26,6 +26,41 @@ export function softDeleteFile(id: string) {
   return prisma.file.update({ where: { id }, data: { deletedAt: new Date() } });
 }
 
+export async function detachFileFromDeliverables(fileId: string): Promise<string[]> {
+  const deliverables = await prisma.deliverable.findMany({
+    where: { satisfiedByFileId: fileId },
+    select: { id: true, requirementId: true },
+  });
+  const links = await prisma.requirementFileLink.findMany({
+    where: { fileId },
+    select: { requirementId: true },
+  });
+  const requirementIds = new Set<string>([
+    ...deliverables.map((d) => d.requirementId),
+    ...links.map((l) => l.requirementId),
+  ]);
+
+  if (deliverables.length > 0) {
+    await prisma.deliverable.updateMany({
+      where: { satisfiedByFileId: fileId },
+      data: { status: "OPEN", satisfiedByFileId: null, satisfiedAt: null },
+    });
+  }
+  await prisma.requirementFileLink.deleteMany({ where: { fileId } });
+
+  return [...requirementIds];
+}
+
+export function updateFileImageMeta(
+  id: string,
+  imageMeta: Prisma.InputJsonValue,
+) {
+  return prisma.file.update({
+    where: { id },
+    data: { imageMeta, analyzedAt: new Date() },
+  });
+}
+
 export function createFile(data: Prisma.FileUncheckedCreateInput) {
   return prisma.file.create({ data });
 }

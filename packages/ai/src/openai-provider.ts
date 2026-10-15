@@ -14,12 +14,15 @@ export interface OpenAiProviderOptions {
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
 function tryParse<T>(
   schema: z.ZodType<T>,
   text: string,
 ): { ok: true; data: T } | { ok: false; error: string } {
-  const cleaned = text
-    .trim()
+  const cleaned = stripThinkTags(text)
     .replace(/^```(?:json)?/i, "")
     .replace(/```$/i, "")
     .trim();
@@ -41,7 +44,11 @@ function tryParse<T>(
 function buildMessages(
   opts: AiCompleteOptions<unknown>,
 ): ChatMessage[] {
-  const messages: ChatMessage[] = [{ role: "system", content: opts.system }];
+  const systemContent =
+    opts.json && !/json/i.test(opts.system)
+      ? `${opts.system}\n\nRespond ONLY with a valid JSON object.`
+      : opts.system;
+  const messages: ChatMessage[] = [{ role: "system", content: systemContent }];
 
   opts.messages.forEach((message: AiMessage, index) => {
     const isLastUser =
@@ -90,8 +97,9 @@ export class OpenAiProvider implements AiProvider {
           : {}),
       });
 
+      const rawText = completion.choices[0]?.message?.content ?? "";
       return {
-        text: completion.choices[0]?.message?.content ?? "",
+        text: stripThinkTags(rawText),
         usage: {
           tokensIn: completion.usage?.prompt_tokens ?? 0,
           tokensOut: completion.usage?.completion_tokens ?? 0,

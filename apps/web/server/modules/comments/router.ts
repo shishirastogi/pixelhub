@@ -8,6 +8,16 @@ export async function list(ctx: RouteCtx<{ id: string }>) {
   return service.listVersionComments(user.id, ctx.params.id);
 }
 
+export async function listForFile(ctx: RouteCtx<{ id: string }>) {
+  const user = await requireUser(ctx.req);
+  return service.listFileComments(user.id, ctx.params.id);
+}
+
+export async function listForProject(ctx: RouteCtx<{ id: string }>) {
+  const user = await requireUser(ctx.req);
+  return service.listProjectComments(user.id, ctx.params.id);
+}
+
 export async function create(ctx: RouteCtx) {
   const user = await requireUser(ctx.req);
   const input = await parseBody(ctx.req, createCommentSchema);

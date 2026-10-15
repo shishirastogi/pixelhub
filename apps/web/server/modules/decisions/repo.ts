@@ -9,6 +9,10 @@ export function listDecisions(
 ) {
   return db.decision.findMany({
     where: { projectId, ...(status ? { status } : {}) },
+    include: {
+      decidedBy: { select: { id: true, name: true } },
+      version: { select: { id: true, number: true, label: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

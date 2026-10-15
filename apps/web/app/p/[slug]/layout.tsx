@@ -1,14 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { LogoutButton } from "@/components/logout-button";
-import { ProjectTabs } from "@/components/project-tabs";
-import { Badge } from "@/components/ui";
+import { ProjectWorkspaceShell } from "@/components/project-tabs";
 import { AppError } from "@/server/errors";
+import { ALL_ROLES, authorizeProject } from "@/server/auth/permissions";
 import { requireCurrentUser } from "@/server/auth/session";
 import { listBranches } from "@/server/modules/branches/service";
 import { getProject } from "@/server/modules/projects/service";
-import { formatDate } from "@/lib/utils";
 
 export default async function ProjectLayout({
   children,
@@ -21,10 +18,12 @@ export default async function ProjectLayout({
 
   let project;
   let branches;
+  let auth;
   try {
-    [project, branches] = await Promise.all([
+    [project, branches, auth] = await Promise.all([
       getProject(user.id, params.slug),
       listBranches(user.id, params.slug),
+      authorizeProject(user.id, params.slug, ALL_ROLES),
     ]);
   } catch (error) {
     if (
@@ -37,59 +36,64 @@ export default async function ProjectLayout({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <header className="mb-6 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <Link
-              href="/app"
-              className="text-xs font-medium text-neutral-500 hover:text-neutral-900"
-            >
-              ← All projects
-            </Link>
-            <div className="mt-1 flex items-center gap-2">
-              <h1 className="text-2xl font-semibold">{project.name}</h1>
-              <Badge tone={project.status === "ACTIVE" ? "success" : "neutral"}>
-                {project.status}
-              </Badge>
-            </div>
-            <p className="text-sm text-neutral-500">
-              {project.clientName ?? "No client"} · Deadline{" "}
-              {formatDate(project.deadline)}
-            </p>
-          </div>
-          <LogoutButton />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
-            Branches
-          </span>
-          {branches.map((branch) => {
-            const active = branch.id === project.defaultBranchId;
-            return (
-              <span
-                key={branch.id}
-                className={
-                  active
-                    ? "rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700"
-                    : "rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-600"
-                }
-                title={branch.kind}
-              >
-                {branch.name}
-                <span className="ml-1 text-neutral-400">
-                  {branch.fileCount} files
-                </span>
-              </span>
-            );
-          })}
-        </div>
-
-        <ProjectTabs slug={project.slug} />
-      </header>
-
+    <ProjectWorkspaceShell
+      project={{
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        status: project.status,
+        clientName: project.clientName,
+        deadline: project.deadline ? project.deadline.toISOString() : null,
+        defaultBranchId: project.defaultBranchId,
+        counts: {
+          files: project._count.files,
+          requirements: project._count.requirements,
+          tasks: project._count.tasks,
+          branches: project._count.branches,
+        },
+      }}
+      branches={branches.map((branch) => ({
+        id: branch.id,
+        name: branch.name,
+        kind: branch.kind,
+        status: branch.status,
+        fileCount: branch.fileCount,
+      }))}
+      members={project.members.map((m) => ({
+        userId: m.userId,
+        role: m.role,
+        canViewFiles: m.canViewFiles,
+        canDownloadFiles: m.canDownloadFiles,
+        canViewBrief: m.canViewBrief,
+        canComment: m.canComment,
+        canApproveVersions: m.canApproveVersions,
+        user: {
+          id: m.user.id,
+          name: m.user.name,
+          email: m.user.email,
+          accountType: m.user.accountType,
+          company: m.user.company,
+          title: m.user.title,
+        },
+      }))}
+      membership={{
+        role: auth.membership.role,
+        canViewFiles: auth.membership.canViewFiles,
+        canDownloadFiles: auth.membership.canDownloadFiles,
+        canViewBrief: auth.membership.canViewBrief,
+        canComment: auth.membership.canComment,
+        canApproveVersions: auth.membership.canApproveVersions,
+      }}
+      user={{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        accountType: user.accountType,
+        company: user.company,
+        title: user.title,
+      }}
+    >
       {children}
-    </div>
+    </ProjectWorkspaceShell>
   );
 }

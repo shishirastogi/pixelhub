@@ -1,5 +1,5 @@
-import { Card, CardTitle } from "@/components/ui";
-import { timeAgo } from "@/lib/utils";
+import { Badge, Card, CardTitle } from "@/components/ui";
+import { initials, timeAgo } from "@/lib/utils";
 
 export interface ActivityItem {
   id: string;
@@ -12,27 +12,45 @@ export interface ActivityItem {
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
     <Card className="h-full">
-      <CardTitle>Recent activity</CardTitle>
+      <CardTitle
+        hint={
+          <Badge tone="neutral">
+            {items.length} event{items.length === 1 ? "" : "s"}
+          </Badge>
+        }
+      >
+        Live Activity Stream
+      </CardTitle>
       {items.length === 0 ? (
-        <p className="text-sm text-neutral-500">No activity yet.</p>
+        <p className="text-xs text-[#6B6860]">No activity recorded yet.</p>
       ) : (
-        <ul className="divide-y divide-neutral-100">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center justify-between gap-3 py-2 text-sm"
-            >
-              <span>
-                <span className="font-medium">
-                  {item.actor?.name ?? "System"}
-                </span>{" "}
-                <span className="text-neutral-500">{item.type}</span>
-              </span>
-              <span className="whitespace-nowrap text-xs text-neutral-400">
-                {timeAgo(item.createdAt)}
-              </span>
-            </li>
-          ))}
+        <ul className="divide-y divide-[#F4F2ED]">
+          {items.map((item) => {
+            const actorName = item.actor?.name ?? "System";
+            return (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-3 py-2.5 text-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F4F2ED] text-[10px] font-semibold text-[#141413]">
+                    {initials(actorName)}
+                  </span>
+                  <span>
+                    <span className="font-semibold text-[#141413]">
+                      {actorName}
+                    </span>{" "}
+                    <span className="text-[#6B6860]">
+                      {item.type.replace(/\./g, " · ")}
+                    </span>
+                  </span>
+                </div>
+                <span className="whitespace-nowrap text-[11px] text-[#9A968C]">
+                  {timeAgo(item.createdAt)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>

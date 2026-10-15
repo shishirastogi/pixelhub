@@ -29,6 +29,7 @@ export const compareVersionsJobInputSchema = z.object({
 export type CompareVersionsJobInput = z.infer<typeof compareVersionsJobInputSchema>;
 
 export const brandCheckInputSchema = z.object({
+  fileId: z.string().uuid().optional(),
   fileIds: z.array(z.string().uuid()).optional(),
 });
 export type BrandCheckInput = z.infer<typeof brandCheckInputSchema>;

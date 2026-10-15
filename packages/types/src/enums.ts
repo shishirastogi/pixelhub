@@ -11,6 +11,26 @@ export const Role = {
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
+export const AccountType = {
+  DESIGNER: "DESIGNER",
+  CLIENT: "CLIENT",
+} as const;
+export type AccountType = (typeof AccountType)[keyof typeof AccountType];
+
+export const InviteDirection = {
+  INVITE: "INVITE",
+  REQUEST: "REQUEST",
+} as const;
+export type InviteDirection =
+  (typeof InviteDirection)[keyof typeof InviteDirection];
+
+export const InviteStatus = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  DECLINED: "DECLINED",
+} as const;
+export type InviteStatus = (typeof InviteStatus)[keyof typeof InviteStatus];
+
 export const ProjectStatus = {
   ACTIVE: "ACTIVE",
   ON_HOLD: "ON_HOLD",

@@ -13,6 +13,9 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
+  accountType: "DESIGNER" | "CLIENT";
+  company: string | null;
+  title: string | null;
   avatarUrl: string | null;
 }
 
@@ -69,8 +72,8 @@ export async function sessionUserFromToken(
     return null;
   }
 
-  const { id, email, name, avatarUrl } = session.user;
-  return { id, email, name, avatarUrl };
+  const { id, email, name, accountType, company, title, avatarUrl } = session.user;
+  return { id, email, name, accountType, company, title, avatarUrl };
 }
 
 export async function optionalUser(req: NextRequest): Promise<SessionUser | null> {

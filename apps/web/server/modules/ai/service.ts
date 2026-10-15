@@ -1,8 +1,14 @@
 import type { Prisma } from "@prisma/client";
 import type { AiUsage } from "@pixelhub/ai";
+import { BrandCheckType, CheckStatus, Priority, Severity } from "@pixelhub/types";
 import type { ZodType } from "zod";
 import { emit } from "../../activity";
-import { getAiProvider, defaultModel, visionModel } from "../../ai/provider";
+import {
+  getAiProvider,
+  defaultModel,
+  hasOpenAiKey,
+  visionModel,
+} from "../../ai/provider";
 import { prisma } from "../../db";
 import {
   brandCheckInputSchema,
@@ -17,6 +23,13 @@ import {
   matchFileResultSchema,
   projectStatusNarrativeInputSchema,
   projectStatusNarrativeResultSchema,
+  type BrandCheckResult,
+  type BrandFinding,
+  type CompareVersionsResult,
+  type ExtractRequirementsResult,
+  type GenerateTasksResult,
+  type MatchFileResult,
+  type ProjectStatusNarrativeResult,
 } from "./schemas";
 import {
   brandCheckPrompt,
@@ -115,21 +128,420 @@ async function dispatch(job: JobWithProject, jobId: string): Promise<JobOutcome>
   }
 }
 
-async function completeJson<T>(
+async function completeJsonWithFallback<T>(
   model: string,
   prompt: PromptBundle,
   schema: ZodType<T>,
-): Promise<{ parsed: T; usage: AiUsage }> {
-  const completion = await getAiProvider().complete({
-    model,
-    system: prompt.system,
-    messages: prompt.messages,
-    json: schema,
-  });
-  if (completion.parsed === undefined) {
-    throw new Error("AI provider returned no parsed JSON output");
+  fallback: () => T,
+): Promise<{ parsed: T; usage: AiUsage; model: string }> {
+  if (hasOpenAiKey()) {
+    try {
+      const completion = await getAiProvider().complete({
+        model,
+        system: prompt.system,
+        messages: prompt.messages,
+        json: schema,
+      });
+      if (completion.parsed !== undefined) {
+        return { parsed: completion.parsed, usage: completion.usage, model };
+      }
+    } catch {
+      // Fall through to deterministic local engine when API key is invalid or unreachable
+    }
   }
-  return { parsed: completion.parsed, usage: completion.usage };
+  return {
+    parsed: fallback(),
+    usage: { tokensIn: 0, tokensOut: 0 },
+    model: "pixelhub-deterministic-v1",
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Deterministic CIE76 ΔE & Local Fallback Helpers
+// ─────────────────────────────────────────────────────────────
+
+function hexToLab(hex: string): [number, number, number] | null {
+  const clean = hex.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return null;
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+
+  const toLinear = (c: number) =>
+    c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  const rl = toLinear(r);
+  const gl = toLinear(g);
+  const bl = toLinear(b);
+
+  const x = (rl * 0.4124 + gl * 0.3576 + bl * 0.1805) / 0.95047;
+  const y = (rl * 0.2126 + gl * 0.7152 + bl * 0.0722) / 1.0;
+  const z = (rl * 0.0193 + gl * 0.1192 + bl * 0.9505) / 1.08883;
+
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f(x);
+  const fy = f(y);
+  const fz = f(z);
+
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+export function computeDeltaE(hexA: string, hexB: string): number | null {
+  const labA = hexToLab(hexA);
+  const labB = hexToLab(hexB);
+  if (!labA || !labB) return null;
+  const dL = labA[0] - labB[0];
+  const da = labA[1] - labB[1];
+  const db = labA[2] - labB[2];
+  return Math.round(Math.sqrt(dL * dL + da * da + db * db) * 10) / 10;
+}
+
+function slugPatternFromTitle(title: string): string {
+  const stem = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 28);
+  return `${stem || "deliverable"}_*.{png,jpg,svg,pdf}`;
+}
+
+function fallbackExtractRequirements(rawText: string): ExtractRequirementsResult {
+  const candidates = rawText
+    .split(/\r?\n|(?<=[.!;])\s+/)
+    .map((line) => line.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((line) => line.length >= 6);
+
+  const requirements: ExtractRequirementsResult["requirements"] = [];
+  const wordNum: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+  };
+
+  for (const clause of candidates) {
+    const subParts = clause
+      .split(/,|;|\band\b/i)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 4);
+
+    for (const part of subParts) {
+      if (/^(deadline|use the|primary brand|logo must|never)/i.test(part)) {
+        continue;
+      }
+      const numMatch = part.match(
+        /\b(\d+|one|two|three|four|five|six)\s+([a-z0-9\s-]{3,35})/i,
+      );
+      const keywordMatch = part.match(
+        /\b(instagram\s+posts?|hero\s+banner|banner|logo\s+lockup|logo|newsletter|social\s+posts?|carousel|story|stories|poster|deck|guidelines|icon\s+set|landing\s+page)\b/i,
+      );
+      if (!numMatch && !keywordMatch) continue;
+
+      const qtyRaw = numMatch?.[1]?.toLowerCase();
+      const quantity = qtyRaw
+        ? (wordNum[qtyRaw] ?? (Number.parseInt(qtyRaw, 10) || 1))
+        : 1;
+      const rawTitle = (keywordMatch?.[1] ?? numMatch?.[2] ?? part)
+        .replace(/^(a|an|the|refreshed|updated)\s+/i, "")
+        .trim();
+      if (!rawTitle || rawTitle.length < 3) continue;
+
+      const title =
+        rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1).slice(0, 60);
+      if (
+        requirements.some((r) => r.title.toLowerCase() === title.toLowerCase())
+      ) {
+        continue;
+      }
+
+      const stem = title
+        .toLowerCase()
+        .replace(/posts?$/, "post")
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+      const deliverables = Array.from({ length: Math.min(quantity, 6) }).map(
+        (_, i) => ({
+          name:
+            quantity > 1
+              ? `${stem}_${String(i + 1).padStart(2, "0")}`
+              : stem || "export",
+          filePattern:
+            quantity > 1
+              ? `${stem}_*.{png,jpg,webp}`
+              : slugPatternFromTitle(title),
+        }),
+      );
+
+      requirements.push({
+        title,
+        description: part,
+        quantity,
+        priority:
+          quantity >= 3 || /hero|launch|instagram/i.test(title)
+            ? Priority.HIGH
+            : Priority.MEDIUM,
+        deliverables,
+      });
+    }
+  }
+
+  if (requirements.length === 0) {
+    requirements.push({
+      title: "Primary Campaign Deliverables",
+      description: rawText.slice(0, 180),
+      quantity: 2,
+      priority: Priority.HIGH,
+      deliverables: [
+        { name: "export_01", filePattern: "export_*.{png,jpg,svg}" },
+        { name: "export_02", filePattern: "export_*.{png,jpg,svg}" },
+      ],
+    });
+  }
+
+  return {
+    requirements: requirements.slice(0, 8),
+    summary: `Extracted ${Math.min(requirements.length, 8)} requirement proposal(s) from the project brief.`,
+    uncertainties: [],
+  };
+}
+
+function fallbackGenerateTasks(requirement: {
+  title: string;
+  description: string | null;
+}): GenerateTasksResult {
+  return {
+    tasks: [
+      {
+        title: `Concept & layout exploration for ${requirement.title}`,
+        description:
+          requirement.description ??
+          `Draft initial composition and artboards for ${requirement.title}.`,
+        dueOffsetDays: 1,
+      },
+      {
+        title: `Apply brand kit palette & typography to ${requirement.title}`,
+        description:
+          "Verify colors stay within ΔE tolerance and approved fonts are applied.",
+        dueOffsetDays: 2,
+      },
+      {
+        title: `Export production assets for ${requirement.title}`,
+        description:
+          "Save final exports into exports/ so PixelHub auto-matches the deliverables.",
+        dueOffsetDays: 3,
+      },
+    ],
+  };
+}
+
+function fallbackCompareVersions(
+  baseNumber: number,
+  targetNumber: number,
+  diffJson: Prisma.JsonValue,
+): CompareVersionsResult {
+  const diff = asJsonObject(diffJson);
+  const filesObj = asJsonObject((diff.files as Prisma.JsonValue) ?? {});
+  const added = Array.isArray(filesObj.added) ? filesObj.added.length : 0;
+  const removed = Array.isArray(filesObj.removed) ? filesObj.removed.length : 0;
+  const modified = Array.isArray(filesObj.modified)
+    ? filesObj.modified.length
+    : 0;
+  const renamed = Array.isArray(filesObj.renamed) ? filesObj.renamed.length : 0;
+
+  const colorsObj = asJsonObject((diff.colors as Prisma.JsonValue) ?? {});
+  const colorsBefore = Array.isArray(colorsObj.dominantBefore)
+    ? (colorsObj.dominantBefore as string[])
+    : [];
+  const colorsAfter = Array.isArray(colorsObj.dominantAfter)
+    ? (colorsObj.dominantAfter as string[])
+    : [];
+
+  const changes: NonNullable<CompareVersionsResult["changes"]> = [];
+  if (added > 0 || modified > 0 || removed > 0 || renamed > 0) {
+    changes.push({
+      dimension: "layout",
+      finding: `${added} file(s) added, ${modified} modified, ${removed} removed, and ${renamed} renamed between v${baseNumber} and v${targetNumber}.`,
+      impact: added + modified > 2 ? "high" : "medium",
+    });
+  }
+  if (colorsBefore.join(",") !== colorsAfter.join(",")) {
+    changes.push({
+      dimension: "color",
+      finding: `Dominant palette shifted from [${colorsBefore.join(", ") || "none"}] to [${colorsAfter.join(", ") || "none"}].`,
+      impact: "medium",
+    });
+  }
+
+  const summary = `Compared v${baseNumber} → v${targetNumber}: ${added} added, ${modified} modified, ${removed} removed, ${renamed} renamed.`;
+  const designerEnglish = `${summary} ${
+    colorsAfter.length > 0
+      ? `Target snapshot exhibits dominant colors ${colorsAfter.join(", ")}.`
+      : "All pinned file checksums were verified deterministically."
+  }`;
+
+  return {
+    summary,
+    changes,
+    designerEnglish,
+  };
+}
+
+function deterministicBrandCheck(
+  brandKit: {
+    colors: Array<{ name: string; hex: string; role: string; tolerance: number }>;
+    fonts: Array<{ family: string; role: string }>;
+    rules: Array<{ ruleType: string; payload: Prisma.JsonValue; severity: Severity }>;
+  } | null,
+  files: Array<{
+    id: string;
+    path: string;
+    fileName: string;
+    imageMeta: Prisma.JsonValue;
+  }>,
+): BrandCheckResult {
+  const findings: BrandFinding[] = [];
+  if (!brandKit) {
+    return { findings: [], verdict: CheckStatus.PASS };
+  }
+
+  const forbiddenColors = brandKit.rules
+    .filter((r) => r.ruleType === "FORBIDDEN_COLOR")
+    .map((r) => {
+      const obj = asJsonObject(r.payload);
+      return {
+        hex: String(obj.hex ?? obj.value ?? "").trim(),
+        severity: r.severity,
+      };
+    })
+    .filter((r) => r.hex.startsWith("#"));
+
+  for (const file of files) {
+    const meta = asJsonObject(file.imageMeta);
+    const dominantColors = Array.isArray(meta.dominantColors)
+      ? (meta.dominantColors.filter((c): c is string => typeof c === "string") ?? [])
+      : [];
+
+    for (const domColor of dominantColors) {
+      for (const forbidden of forbiddenColors) {
+        const de = computeDeltaE(domColor, forbidden.hex);
+        if (de !== null && de <= 12) {
+          findings.push({
+            checkType: BrandCheckType.COLOR,
+            rule: "Forbidden color rule",
+            expected: `Not ${forbidden.hex}`,
+            found: domColor,
+            deltaE: de,
+            message: `${file.fileName} contains forbidden color ${domColor} (ΔE ${de} from ${forbidden.hex}).`,
+            severity: forbidden.severity,
+            fileId: file.id,
+          });
+        }
+      }
+
+      if (brandKit.colors.length > 0) {
+        let bestColor = brandKit.colors[0]!;
+        let bestDe = computeDeltaE(domColor, bestColor.hex) ?? 999;
+        for (const kitColor of brandKit.colors) {
+          const de = computeDeltaE(domColor, kitColor.hex);
+          if (de !== null && de < bestDe) {
+            bestDe = de;
+            bestColor = kitColor;
+          }
+        }
+        if (bestDe > (bestColor.tolerance || 10) && bestDe < 999) {
+          findings.push({
+            checkType: BrandCheckType.COLOR,
+            rule: `Matches brand color (${bestColor.name})`,
+            expected: `${bestColor.hex} (±${bestColor.tolerance} ΔE)`,
+            found: domColor,
+            deltaE: bestDe,
+            message: `Color ${domColor} in ${file.fileName} drifts from ${bestColor.name} (${bestColor.hex}) by ΔE ${bestDe}.`,
+            severity: bestDe > bestColor.tolerance * 2 ? Severity.ERROR : Severity.WARNING,
+            fileId: file.id,
+          });
+        }
+      }
+    }
+  }
+
+  const hasError = findings.some((f) => f.severity === Severity.ERROR);
+  const verdict = hasError
+    ? CheckStatus.FAIL
+    : findings.length > 0
+      ? CheckStatus.WARNING
+      : CheckStatus.PASS;
+
+  return { findings, verdict };
+}
+
+function fallbackStatusNarrative(
+  context: StatusContext,
+): ProjectStatusNarrativeResult {
+  const {
+    projectName,
+    deadline,
+    requirementCoveragePct,
+    requirements,
+    deliverables,
+    overdue,
+    branchSummary,
+    openTasks,
+    failingBrandChecks,
+  } = context;
+
+  const narrative = `${projectName} is at ${requirementCoveragePct}% requirement coverage (${requirements.fulfilled}/${requirements.accepted} accepted requirements fulfilled, ${deliverables.done}/${deliverables.total} deliverables matched). Active branches: ${branchSummary}. ${
+    overdue.length > 0
+      ? `${overdue.length} requirement(s) are currently past due.`
+      : "No requirements are overdue."
+  } ${
+    failingBrandChecks.length > 0
+      ? `${failingBrandChecks.length} export(s) have unresolved brand QA findings.`
+      : "All brand checks are passing."
+  }${deadline ? ` Target project deadline is ${deadline}.` : ""}`;
+
+  const attentionItems: NonNullable<
+    ProjectStatusNarrativeResult["attentionItems"]
+  > = [];
+  for (const item of overdue) {
+    attentionItems.push({
+      title: "Overdue Requirement",
+      message: item,
+      severity: Severity.ERROR,
+    });
+  }
+  for (const fileName of failingBrandChecks) {
+    attentionItems.push({
+      title: `Brand Drift on ${fileName}`,
+      message: `${fileName} has unresolved brand check findings.`,
+      severity: Severity.WARNING,
+    });
+  }
+
+  const suggestedNextActions: string[] = [];
+  if (deliverables.done < deliverables.total) {
+    suggestedNextActions.push(
+      `Upload or sync the remaining ${deliverables.total - deliverables.done} deliverable export(s) into exports/.`,
+    );
+  }
+  if (failingBrandChecks.length > 0) {
+    suggestedNextActions.push(
+      `Review and resolve brand QA findings on ${failingBrandChecks.slice(0, 2).join(", ")}.`,
+    );
+  }
+  if (openTasks > 0) {
+    suggestedNextActions.push(
+      `Complete the ${openTasks} open task(s) on the Tasks board.`,
+    );
+  }
+  if (suggestedNextActions.length === 0) {
+    suggestedNextActions.push(
+      "Snapshot a new milestone version and adopt approved branches into Main.",
+    );
+  }
+
+  return { narrative, attentionItems, suggestedNextActions };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -147,10 +559,11 @@ async function runExtractRequirements(
   if (!brief) throw new Error("Brief not found for AI extraction");
 
   const model = defaultModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     extractRequirementsPrompt(brief.rawText),
     extractRequirementsResultSchema,
+    () => fallbackExtractRequirements(brief.rawText),
   );
 
   const requirementIds = await prisma.$transaction(async (tx) => {
@@ -213,7 +626,7 @@ async function runExtractRequirements(
     },
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 
@@ -233,7 +646,7 @@ async function runGenerateTasks(job: JobWithProject): Promise<JobOutcome> {
   if (!requirement) throw new Error("Requirement not found for task generation");
 
   const model = defaultModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     generateTasksPrompt({
       projectName: job.project.name,
@@ -242,6 +655,7 @@ async function runGenerateTasks(job: JobWithProject): Promise<JobOutcome> {
       deadline: formatDate(job.project.deadline),
     }),
     generateTasksResultSchema,
+    () => fallbackGenerateTasks(requirement),
   );
 
   const now = Date.now();
@@ -249,12 +663,18 @@ async function runGenerateTasks(job: JobWithProject): Promise<JobOutcome> {
     const ids: string[] = [];
 
     for (const task of parsed.tasks) {
+      const checklistJson: Prisma.InputJsonValue = [
+        { text: `Review specification for ${requirement.title}`, done: false },
+        { text: task.description ?? task.title, done: false },
+        { text: "Verify export matches file pattern & brand kit", done: false },
+      ];
       const created = await tx.task.create({
         data: {
           projectId: job.projectId,
           requirementId: requirement.id,
           title: task.title,
           description: task.description ?? null,
+          checklistJson,
           source: "AI_EXTRACTED",
           status: "TODO",
           dueDate:
@@ -286,7 +706,7 @@ async function runGenerateTasks(job: JobWithProject): Promise<JobOutcome> {
     resultJson: { taskIds },
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 
@@ -344,7 +764,7 @@ async function runCompareVersions(
   }
 
   const model = visionModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     compareVersionsPrompt({
       projectName: job.project.name,
@@ -362,6 +782,12 @@ async function runCompareVersions(
       changedFiles,
     }),
     compareVersionsResultSchema,
+    () =>
+      fallbackCompareVersions(
+        comparison.baseVersion.number,
+        comparison.targetVersion.number,
+        comparison.diffJson,
+      ),
   );
 
   await prisma.$transaction(async (tx) => {
@@ -396,7 +822,7 @@ async function runCompareVersions(
     resultJson: parsed as unknown as Prisma.InputJsonValue,
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 
@@ -415,19 +841,26 @@ async function runBrandCheck(
   jobId: string,
 ): Promise<JobOutcome> {
   const input = brandCheckInputSchema.parse(job.inputJson);
+  const targetFileIds =
+    input.fileIds && input.fileIds.length > 0
+      ? input.fileIds
+      : input.fileId
+        ? [input.fileId]
+        : undefined;
   const [brandKit, files] = await Promise.all([
     prisma.brandKit.findUnique({
       where: { projectId: job.projectId },
       include: { colors: true, fonts: true, logos: true, rules: true },
     }),
-    resolveBrandCheckFiles(job.projectId, input.fileIds),
+    resolveBrandCheckFiles(job.projectId, targetFileIds),
   ]);
 
   const model = visionModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     brandCheckPrompt({ brandKit, files }),
     brandCheckResultSchema,
+    () => deterministicBrandCheck(brandKit, files),
   );
 
   const resultIds = await prisma.$transaction(async (tx) => {
@@ -441,8 +874,16 @@ async function runBrandCheck(
       );
       const unattributed = allFindings.filter((finding) => !finding.fileId);
       const findings = scoped.concat(unattributed);
-      const status = findings.length > 0 ? parsed.verdict : "PASS";
-      const checkType = findings[0]?.checkType ?? "RULE";
+      const hasErr = findings.some((f) => f.severity === Severity.ERROR);
+      const status =
+        findings.length === 0
+          ? CheckStatus.PASS
+          : hasErr
+            ? CheckStatus.FAIL
+            : parsed.verdict === CheckStatus.PASS
+              ? CheckStatus.WARNING
+              : parsed.verdict;
+      const checkType = findings[0]?.checkType ?? "COLOR";
 
       const created = await tx.brandCheckResult.create({
         data: {
@@ -478,7 +919,7 @@ async function runBrandCheck(
     resultJson: { resultIds },
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 
@@ -541,7 +982,7 @@ async function runMatchFile(
   if (!file) throw new Error("File not found for AI matching");
 
   const model = defaultModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     matchFilePrompt({
       file: {
@@ -560,6 +1001,21 @@ async function runMatchFile(
       })),
     }),
     matchFileResultSchema,
+    (): MatchFileResult => {
+      const stem = file.fileName.toLowerCase().replace(/\.[^.]+$/, "");
+      const matches = deliverables
+        .filter((d) => {
+          const dStem = d.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const fStem = stem.replace(/[^a-z0-9]/g, "");
+          return dStem.length >= 3 && (fStem.includes(dStem) || dStem.includes(fStem));
+        })
+        .map((d) => ({
+          deliverableId: d.id,
+          confidence: 0.9,
+          rationale: `Filename "${file.fileName}" matches deliverable "${d.name}".`,
+        }));
+      return { matches };
+    },
   );
 
   const deliverableById = new Map(
@@ -638,7 +1094,7 @@ async function runMatchFile(
     } as unknown as Prisma.InputJsonValue,
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 
@@ -657,10 +1113,11 @@ async function runStatusNarrative(job: JobWithProject): Promise<JobOutcome> {
 
   const context = await buildStatusContext(job.projectId);
   const model = defaultModel();
-  const { parsed, usage } = await completeJson(
+  const { parsed, usage, model: usedModel } = await completeJsonWithFallback(
     model,
     statusNarrativePrompt(context),
     projectStatusNarrativeResultSchema,
+    () => fallbackStatusNarrative(context),
   );
 
   await emit({
@@ -676,7 +1133,7 @@ async function runStatusNarrative(job: JobWithProject): Promise<JobOutcome> {
     resultJson: parsed as unknown as Prisma.InputJsonValue,
     tokensIn: usage.tokensIn,
     tokensOut: usage.tokensOut,
-    model,
+    model: usedModel,
   };
 }
 

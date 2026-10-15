@@ -15,6 +15,7 @@ import {
   Textarea,
 } from "@/components/form";
 import { Modal } from "@/components/modal";
+import FileDetailModal from "@/components/files/FileDetailModal";
 import MergeModal from "./MergeModal";
 
 export interface BranchInfo {
@@ -36,6 +37,16 @@ export interface VersionInfo {
   fileCount: number;
   createdBy: { id: string; name: string } | null;
   sourceBranch: { id: string; name: string; kind: string } | null;
+}
+
+interface VersionComment {
+  id: string;
+  body: string;
+  status: "OPEN" | "RESOLVED";
+  createdAt: string;
+  convertedTaskId: string | null;
+  author: { id: string; name: string } | null;
+  replies?: VersionComment[];
 }
 
 interface VersionDetail {
@@ -91,14 +102,23 @@ export default function VersionsTab({
   initialBranches,
   defaultBranchId,
   initialVersions,
+  isClient = false,
+  canApproveVersions = true,
+  canComment = true,
+  canDownload = true,
 }: {
   projectId: string;
   projectSlug: string;
   initialBranches: BranchInfo[];
   defaultBranchId: string | null;
   initialVersions: VersionInfo[];
+  isClient?: boolean;
+  canApproveVersions?: boolean;
+  canComment?: boolean;
+  canDownload?: boolean;
 }) {
   const router = useRouter();
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
   const [branches, setBranches] = useState<BranchInfo[]>(initialBranches);
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(
@@ -115,6 +135,8 @@ export default function VersionsTab({
   );
   const [detail, setDetail] = useState<VersionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [comments, setComments] = useState<VersionComment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -168,14 +190,33 @@ export default function VersionsTab({
     void loadVersions(branchId);
   }
 
+  const loadComments = useCallback(async (versionId: string) => {
+    try {
+      const list = await apiFetch<VersionComment[]>(
+        `/versions/${versionId}/comments`,
+      );
+      setComments(list);
+    } catch {
+      setComments([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (!selectedVersionId) return;
     let cancelled = false;
     setDetailLoading(true);
     setConfirmingRestore(false);
-    apiFetch<VersionDetail>(`/versions/${selectedVersionId}`)
-      .then((res) => {
-        if (!cancelled) setDetail(res);
+    Promise.all([
+      apiFetch<VersionDetail>(`/versions/${selectedVersionId}`),
+      apiFetch<VersionComment[]>(`/versions/${selectedVersionId}/comments`).catch(
+        () => [],
+      ),
+    ])
+      .then(([res, commentList]) => {
+        if (!cancelled) {
+          setDetail(res);
+          setComments(commentList);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -191,6 +232,42 @@ export default function VersionsTab({
       cancelled = true;
     };
   }, [selectedVersionId]);
+
+  async function postComment() {
+    if (!selectedVersionId || !commentBody.trim()) return;
+    await withAction(async () => {
+      await apiFetch(`/comments`, {
+        method: "POST",
+        body: JSON.stringify({
+          versionId: selectedVersionId,
+          body: commentBody.trim(),
+        }),
+      });
+      setCommentBody("");
+      await loadComments(selectedVersionId);
+      setNote("Comment posted.");
+    });
+  }
+
+  async function resolveComment(commentId: string) {
+    if (!selectedVersionId) return;
+    await withAction(async () => {
+      await apiFetch(`/comments/${commentId}/resolve`, { method: "POST" });
+      await loadComments(selectedVersionId);
+      setNote("Comment resolved.");
+    });
+  }
+
+  async function convertCommentToTask(commentId: string) {
+    if (!selectedVersionId) return;
+    await withAction(async () => {
+      await apiFetch(`/comments/${commentId}/convert-to-task`, {
+        method: "POST",
+      });
+      await loadComments(selectedVersionId);
+      setNote("Comment converted into a task on the Tasks board.");
+    });
+  }
 
   function toggleChecked(id: string) {
     setChecked((prev) => {
@@ -338,13 +415,15 @@ export default function VersionsTab({
         <Card className="h-fit">
           <CardTitle
             hint={
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setNewBranchOpen(true)}
-              >
-                + New branch
-              </Button>
+              !isClient ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setNewBranchOpen(true)}
+                >
+                  + New branch
+                </Button>
+              ) : null
             }
           >
             Branches
@@ -358,15 +437,15 @@ export default function VersionsTab({
                 <div
                   key={branch.id}
                   className={cn(
-                    "cursor-pointer rounded-xl border p-3 transition",
+                    "cursor-pointer rounded-2xl border p-3.5 transition",
                     isSelected
-                      ? "border-rose-300 bg-rose-50/50"
-                      : "border-neutral-200 bg-white hover:border-neutral-300",
+                      ? "border-[#141413] bg-[#FAF8F4] shadow-pill"
+                      : "border-[#EBE7DF] bg-white hover:border-[#D5CFC2]",
                   )}
                   onClick={() => selectBranch(branch.id)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-neutral-800">
+                    <span className="font-semibold text-[#141413]">
                       {branch.name}
                     </span>
                     <Badge tone={KIND_TONE[branch.kind] ?? "neutral"}>
@@ -378,12 +457,10 @@ export default function VersionsTab({
                       </Badge>
                     ) : null}
                     {isCurrent ? (
-                      <span className="text-xs font-medium text-rose-600">
-                        ← current
-                      </span>
+                      <Badge tone="lime">current</Badge>
                     ) : null}
                   </div>
-                  <p className="mt-1 text-xs text-neutral-500">
+                  <p className="mt-1 text-xs text-[#6B6860]">
                     {branch.fileCount} file{branch.fileCount === 1 ? "" : "s"}
                     {branch.headVersion
                       ? ` · v${branch.headVersion.number}`
@@ -403,79 +480,96 @@ export default function VersionsTab({
                       className="mt-2 flex flex-wrap gap-1.5"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {!isCurrent ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => void switchTo(branch)}
-                        >
-                          Switch to
-                        </Button>
-                      ) : null}
-                      {branch.kind !== "MAIN" &&
-                      branch.status !== "MERGED" &&
-                      branch.status !== "ABANDONED" ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => setMerging(branch)}
-                        >
-                          Adopt into {mainBranch?.name ?? "Main"}
-                        </Button>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        onClick={() => {
-                          setRenaming(branch);
-                          setRenameValue(branch.name);
-                        }}
-                      >
-                        Rename
-                      </Button>
-                      {branch.kind !== "MAIN" ? (
-                        branch.status === "ABANDONED" ||
-                        branch.status === "MERGED" ||
-                        branch.status === "APPROVED" ? (
+                      {isClient ? (
+                        canApproveVersions && branch.status !== "APPROVED" ? (
+                          <Button
+                            size="sm"
+                            variant="lime"
+                            disabled={busy}
+                            onClick={() =>
+                              void setBranchStatus(branch, "APPROVED")
+                            }
+                          >
+                            ✓ Approve Direction
+                          </Button>
+                        ) : null
+                      ) : (
+                        <>
+                          {!isCurrent ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() => void switchTo(branch)}
+                            >
+                              Switch to
+                            </Button>
+                          ) : null}
+                          {branch.kind !== "MAIN" &&
+                          branch.status !== "MERGED" &&
+                          branch.status !== "ABANDONED" ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() => setMerging(branch)}
+                            >
+                              Adopt into {mainBranch?.name ?? "Main"}
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
                             disabled={busy}
-                            onClick={() =>
-                              void setBranchStatus(branch, "ACTIVE")
-                            }
+                            onClick={() => {
+                              setRenaming(branch);
+                              setRenameValue(branch.name);
+                            }}
                           >
-                            Reopen
+                            Rename
                           </Button>
-                        ) : (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                void setBranchStatus(branch, "APPROVED")
-                              }
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-rose-600"
-                              disabled={busy}
-                              onClick={() =>
-                                void setBranchStatus(branch, "ABANDONED")
-                              }
-                            >
-                              Abandon
-                            </Button>
-                          </>
-                        )
-                      ) : null}
+                          {branch.kind !== "MAIN" ? (
+                            branch.status === "ABANDONED" ||
+                            branch.status === "MERGED" ||
+                            branch.status === "APPROVED" ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() =>
+                                  void setBranchStatus(branch, "ACTIVE")
+                                }
+                              >
+                                Reopen
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void setBranchStatus(branch, "APPROVED")
+                                  }
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-rose-600"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void setBranchStatus(branch, "ABANDONED")
+                                  }
+                                >
+                                  Abandon
+                                </Button>
+                              </>
+                            )
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -497,13 +591,15 @@ export default function VersionsTab({
                   >
                     Compare selected ({checked.size})
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={!selectedBranch || busy}
-                    onClick={() => setSnapshotOpen(true)}
-                  >
-                    Snapshot current state
-                  </Button>
+                  {!isClient ? (
+                    <Button
+                      size="sm"
+                      disabled={!selectedBranch || busy}
+                      onClick={() => setSnapshotOpen(true)}
+                    >
+                      Snapshot current state
+                    </Button>
+                  ) : null}
                 </div>
               }
             >
@@ -519,13 +615,13 @@ export default function VersionsTab({
                 description="Snapshot the current state to freeze a checkpoint of this branch."
               />
             ) : (
-              <ul className="divide-y divide-neutral-100">
+              <ul className="divide-y divide-[#F4F2ED]">
                 {versions.map((version) => (
                   <li key={version.id}>
                     <div
                       className={cn(
-                        "flex cursor-pointer items-center gap-3 px-1 py-2.5 transition hover:bg-neutral-50",
-                        version.id === selectedVersionId && "bg-neutral-50",
+                        "flex cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 transition hover:bg-[#FAF8F4]",
+                        version.id === selectedVersionId && "bg-[#FAF8F4]",
                       )}
                       onClick={() => setSelectedVersionId(version.id)}
                     >
@@ -534,16 +630,16 @@ export default function VersionsTab({
                         checked={checked.has(version.id)}
                         onChange={() => toggleChecked(version.id)}
                         onClick={(event) => event.stopPropagation()}
-                        className="h-4 w-4 accent-rose-600"
+                        className="h-4 w-4 accent-[#141413]"
                       />
-                      <span className="w-10 shrink-0 font-mono text-sm font-medium text-neutral-700">
+                      <span className="inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-xl bg-[#141413] font-mono text-xs font-semibold text-white">
                         v{version.number}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-neutral-800">
+                        <span className="block truncate text-sm font-semibold text-[#141413]">
                           {version.label ?? "Untitled snapshot"}
                         </span>
-                        <span className="block truncate text-xs text-neutral-500">
+                        <span className="block truncate text-xs text-[#6B6860]">
                           {version.fileCount} file
                           {version.fileCount === 1 ? "" : "s"} ·{" "}
                           {timeAgo(version.createdAt)}
@@ -555,7 +651,7 @@ export default function VersionsTab({
                             : ""}
                         </span>
                       </span>
-                      <span className="shrink-0 text-neutral-300">›</span>
+                      <span className="shrink-0 text-[#9A968C]">›</span>
                     </div>
                   </li>
                 ))}
@@ -600,67 +696,173 @@ export default function VersionsTab({
                   ) : null}
 
                   <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-                      Files ({detail.files.length})
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#6B6860]">
+                      Snapshot Files ({detail.files.length}) · click to preview
+                      &amp; review
                     </p>
                     {detail.files.length === 0 ? (
                       <p className="text-sm text-neutral-500">
                         No files in this snapshot.
                       </p>
                     ) : (
-                      <ul className="max-h-60 space-y-1 overflow-auto">
+                      <div className="grid gap-2.5 sm:grid-cols-2">
                         {detail.files.map((versionFile) => (
-                          <li
+                          <button
                             key={versionFile.id}
-                            className="flex items-center justify-between gap-2 rounded-lg bg-neutral-50 px-3 py-1.5 text-sm"
+                            type="button"
+                            onClick={() =>
+                              setPreviewFileId(versionFile.file.id)
+                            }
+                            className="flex items-center justify-between gap-2.5 rounded-2xl border border-[#EBE7DF] bg-[#FAF8F4] p-2.5 text-left text-xs transition hover:border-[#141413]/30 hover:bg-white"
                           >
-                            <span className="min-w-0">
-                              <span className="block truncate font-mono text-xs text-neutral-700">
-                                {versionFile.path}
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={`/api/v1/files/${versionFile.file.id}/preview`}
+                                alt={versionFile.file.fileName}
+                                className="h-10 w-10 shrink-0 rounded-xl border border-[#EBE7DF] bg-[#141413] object-cover"
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold text-[#141413]">
+                                  {versionFile.file.fileName}
+                                </span>
+                                <span className="block truncate font-mono text-[11px] text-[#6B6860]">
+                                  {versionFile.path}
+                                </span>
                               </span>
-                            </span>
+                            </div>
                             <Badge tone="neutral">{versionFile.role}</Badge>
-                          </li>
+                          </button>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {confirmingRestore ? (
-                      <>
-                        <span className="text-sm text-rose-600">
-                          Restore as new version?
-                        </span>
+                  {!isClient ? (
+                    <div className="flex items-center gap-2">
+                      {confirmingRestore ? (
+                        <>
+                          <span className="text-sm text-rose-600">
+                            Restore as new version?
+                          </span>
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void restoreVersion()}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirmingRestore(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
                         <Button
                           size="sm"
+                          variant="secondary"
                           disabled={busy}
-                          onClick={() => void restoreVersion()}
+                          onClick={() => setConfirmingRestore(true)}
                         >
-                          Restore
+                          Restore as new version
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmingRestore(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => setConfirmingRestore(true)}
-                      >
-                        Restore as new version
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </Card>
+                      )}
+                    </div>
+                  ) : null}
+
+                   {/* Version Review Comments Thread */}
+                   <div className="border-t border-[#EFECE6] pt-4">
+                     <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-[#6B6860]">
+                       Review Feedback & Comments ({comments.length})
+                     </p>
+                     {comments.length === 0 ? (
+                       <p className="mb-3 text-xs text-[#6B6860]">
+                         No feedback on this snapshot yet. Leave a review note
+                         below.
+                       </p>
+                     ) : (
+                       <ul className="mb-3 space-y-2">
+                         {comments.map((comment) => (
+                           <li
+                             key={comment.id}
+                             className="rounded-2xl border border-[#EBE7DF] bg-[#FAF8F4] p-3 text-xs"
+                           >
+                             <div className="flex flex-wrap items-center justify-between gap-2">
+                               <div className="flex items-center gap-2">
+                                 <span className="font-semibold text-[#141413]">
+                                   {comment.author?.name ?? "Reviewer"}
+                                 </span>
+                                 <span className="text-[#9A968C]">
+                                   {timeAgo(comment.createdAt)}
+                                 </span>
+                                 <Badge
+                                   tone={
+                                     comment.status === "RESOLVED"
+                                       ? "lime"
+                                       : "warning"
+                                   }
+                                 >
+                                   {comment.status}
+                                 </Badge>
+                                 {comment.convertedTaskId ? (
+                                   <Badge tone="violet">Task created</Badge>
+                                 ) : null}
+                               </div>
+                               <div className="flex items-center gap-1.5">
+                                 {!comment.convertedTaskId ? (
+                                   <Button
+                                     size="sm"
+                                     variant="secondary"
+                                     disabled={busy}
+                                     onClick={() =>
+                                       void convertCommentToTask(comment.id)
+                                     }
+                                   >
+                                     → Convert to Task
+                                   </Button>
+                                 ) : null}
+                                 {comment.status !== "RESOLVED" ? (
+                                   <Button
+                                     size="sm"
+                                     variant="ghost"
+                                     disabled={busy}
+                                     onClick={() =>
+                                       void resolveComment(comment.id)
+                                     }
+                                   >
+                                     Resolve
+                                   </Button>
+                                 ) : null}
+                               </div>
+                             </div>
+                             <p className="mt-1.5 leading-relaxed text-[#141413]">
+                               {comment.body}
+                             </p>
+                           </li>
+                         ))}
+                       </ul>
+                     )}
+                     <div className="flex items-center gap-2">
+                       <Input
+                         value={commentBody}
+                         onChange={(e) => setCommentBody(e.target.value)}
+                         placeholder="Add client or team feedback on this snapshot…"
+                       />
+                       <Button
+                         size="sm"
+                         disabled={busy || !commentBody.trim()}
+                         onClick={() => void postComment()}
+                       >
+                         Post
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
+               )}
+             </Card>
           ) : null}
         </div>
       </div>
@@ -819,6 +1021,20 @@ export default function VersionsTab({
           setNote(message);
           void refreshBranches();
           if (mainBranch) selectBranch(mainBranch.id);
+        }}
+      />
+
+      <FileDetailModal
+        key={previewFileId ?? "none"}
+        fileId={previewFileId}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        isClient={isClient}
+        canDownload={canDownload}
+        canComment={canComment}
+        onClose={() => setPreviewFileId(null)}
+        onChanged={() => {
+          router.refresh();
         }}
       />
     </div>

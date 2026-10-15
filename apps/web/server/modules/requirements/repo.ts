@@ -80,7 +80,7 @@ export function softDeleteRequirement(id: string, db: Db = prisma) {
 export function findFileInProject(fileId: string, projectId: string) {
   return prisma.file.findFirst({
     where: { id: fileId, projectId, deletedAt: null },
-    select: { id: true },
+    select: { id: true, fileName: true, path: true },
   });
 }
 
@@ -179,6 +179,21 @@ export function satisfyDeliverable(id: string, fileId: string, db: Db = prisma) 
       status: "SATISFIED",
       satisfiedByFileId: fileId,
       satisfiedAt: new Date(),
+    },
+  });
+}
+
+export function unsatisfyDeliverablesByFile(
+  requirementId: string,
+  fileId: string,
+  db: Db = prisma,
+) {
+  return db.deliverable.updateMany({
+    where: { requirementId, satisfiedByFileId: fileId },
+    data: {
+      status: "OPEN",
+      satisfiedByFileId: null,
+      satisfiedAt: null,
     },
   });
 }

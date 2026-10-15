@@ -141,12 +141,12 @@ export default function MergeModal({
           <ul className="max-h-72 space-y-1 overflow-auto">
             {files.map((file) => (
               <li key={file.id}>
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 transition hover:bg-neutral-50">
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-[#EBE7DF] bg-[#FAF8F4] px-3.5 py-2.5 transition hover:bg-white">
                   <input
                     type="checkbox"
                     checked={selected.has(file.id)}
                     onChange={() => toggle(file.id)}
-                    className="h-4 w-4 accent-rose-600"
+                    className="h-4 w-4 accent-[#141413]"
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-neutral-800">

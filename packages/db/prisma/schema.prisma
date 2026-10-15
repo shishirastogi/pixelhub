@@ -22,6 +22,22 @@ enum Role {
   CLIENT
 }
 
+enum AccountType {
+  DESIGNER
+  CLIENT
+}
+
+enum InviteDirection {
+  INVITE
+  REQUEST
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
 enum ProjectStatus {
   ACTIVE
   ON_HOLD
@@ -207,17 +223,22 @@ enum AiJobStatus {
 // ─────────────────────────────────────────────────────────────
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String      @id @default(uuid())
+  email        String      @unique
   name         String
+  accountType  AccountType @default(DESIGNER)
+  company      String?
+  title        String?
   avatarUrl    String?
   passwordHash String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   deletedAt    DateTime?
 
   sessions         Session[]
   memberships      ProjectMember[]
+  sentInvites      ProjectInvite[] @relation("InviteSentBy")
+  receivedInvites  ProjectInvite[] @relation("InviteTargetUser")
   pairedDevices    WatcherDevice[]
   uploadedFiles    File[]          @relation("FileUploadedBy")
   createdVersions  Version[]       @relation("VersionCreatedBy")
@@ -240,6 +261,19 @@ model Session {
   @@index([userId])
 }
 
+model EmailOtp {
+  id        String   @id @default(uuid())
+  email     String
+  purpose   String
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, purpose])
+  @@index([email, purpose])
+}
+
 model Project {
   id              String        @id @default(uuid())
   name            String
@@ -256,6 +290,7 @@ model Project {
   deletedAt       DateTime?
 
   members            ProjectMember[]
+  invites            ProjectInvite[]
   watcherDevices     WatcherDevice[]
   defaultBranch      Branch?             @relation("ProjectDefaultBranch", fields: [defaultBranchId], references: [id], onDelete: SetNull)
   branches           Branch[]            @relation("ProjectBranches")
@@ -277,17 +312,49 @@ model Project {
 }
 
 model ProjectMember {
-  projectId String
-  userId    String
-  role      Role
-  invitedBy String?
-  joinedAt  DateTime @default(now())
+  projectId          String
+  userId             String
+  role               Role
+  invitedBy          String?
+  canViewFiles       Boolean  @default(true)
+  canDownloadFiles   Boolean  @default(false)
+  canViewBrief       Boolean  @default(true)
+  canComment         Boolean  @default(true)
+  canApproveVersions Boolean  @default(true)
+  joinedAt           DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([projectId, userId])
   @@index([userId])
+}
+
+model ProjectInvite {
+  id                 String          @id @default(uuid())
+  projectId          String
+  email              String
+  userId             String?
+  invitedById        String?
+  direction          InviteDirection @default(INVITE)
+  role               Role            @default(CLIENT)
+  status             InviteStatus    @default(PENDING)
+  message            String?
+  canViewFiles       Boolean         @default(true)
+  canDownloadFiles   Boolean         @default(false)
+  canViewBrief       Boolean         @default(true)
+  canComment         Boolean         @default(true)
+  canApproveVersions Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User?   @relation("InviteTargetUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy User?   @relation("InviteSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([email, status])
+  @@index([userId, status])
 }
 
 model WatcherDevice {

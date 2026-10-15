@@ -88,21 +88,23 @@ export function FilePickerModal({
             <li key={file.id}>
               <button
                 type="button"
-                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-left text-sm transition hover:border-rose-300 hover:bg-rose-50/40"
+                className="w-full rounded-xl border border-[#EBE7DF] bg-[#FAF8F4] px-3.5 py-2.5 text-left text-xs transition hover:border-[#7C3AED] hover:bg-white"
                 onClick={() => {
                   onSelect(file);
                   onClose();
                 }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-medium text-neutral-800">
+                  <span className="truncate font-semibold text-[#141413]">
                     {file.fileName}
                   </span>
-                  <span className="shrink-0 text-xs text-neutral-400">
+                  <span className="shrink-0 text-[11px] text-[#6B6860]">
                     {formatBytes(file.sizeBytes)}
                   </span>
                 </div>
-                <p className="truncate text-xs text-neutral-500">{file.path}</p>
+                <p className="truncate font-mono text-[11px] text-[#6B6860]">
+                  {file.path}
+                </p>
               </button>
             </li>
           ))}

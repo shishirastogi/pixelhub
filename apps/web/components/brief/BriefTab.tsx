@@ -299,34 +299,36 @@ export default function BriefTab({
       {extractError ? <ErrorText>{extractError}</ErrorText> : null}
 
       {proposals.length > 0 ? (
-        <Card className="border-dashed border-amber-300 bg-amber-50/40">
-          <CardTitle>
-            Proposed requirements ({proposals.length}) — from AI extraction
+        <div className="rounded-[24px] border border-sky-200/80 bg-ai-sky p-6 shadow-card">
+          <CardTitle
+            hint={<Badge tone="lime">{proposals.length} AI Proposals</Badge>}
+          >
+            Proposed Requirements — AI Extraction
           </CardTitle>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {proposals.map((proposal) => (
               <div
                 key={proposal.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-amber-300 bg-white px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-sm backdrop-blur"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-neutral-800">
+                    <span className="font-semibold text-[#141413]">
                       {proposal.title}
                     </span>
                     <Badge tone="warning">PENDING</Badge>
                     {proposal.quantity > 1 ? (
-                      <span className="text-xs text-neutral-500">
+                      <span className="text-xs text-[#6B6860]">
                         ×{proposal.quantity}
                       </span>
                     ) : null}
                   </div>
                   {proposal.description ? (
-                    <p className="mt-0.5 text-xs text-neutral-500">
+                    <p className="mt-0.5 text-xs text-[#6B6860]">
                       {proposal.description}
                     </p>
                   ) : null}
-                  <p className="mt-0.5 text-xs text-neutral-400">
+                  <p className="mt-0.5 text-xs text-[#9A968C]">
                     {proposal.deliverables.length} deliverable
                     {proposal.deliverables.length === 1 ? "" : "s"}
                   </p>
@@ -334,6 +336,7 @@ export default function BriefTab({
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
                     size="sm"
+                    variant="lime"
                     disabled={actingId === proposal.id}
                     onClick={() =>
                       void setRequirementStatus(proposal.id, "ACCEPTED")
@@ -355,7 +358,7 @@ export default function BriefTab({
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       ) : null}
 
       <Card>
@@ -363,7 +366,6 @@ export default function BriefTab({
           hint={
             <Button
               size="sm"
-              variant="secondary"
               onClick={() => {
                 setEditing(null);
                 setModalOpen(true);
@@ -373,7 +375,7 @@ export default function BriefTab({
             </Button>
           }
         >
-          Requirements
+          Requirements & Deliverable Contracts
         </CardTitle>
 
         <div className="mb-4 flex flex-wrap gap-1.5">
@@ -383,14 +385,14 @@ export default function BriefTab({
               type="button"
               onClick={() => setFilter(f)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition",
+                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
                 filter === f
-                  ? "border-rose-200 bg-rose-50 text-rose-700"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50",
+                  ? "border-[#141413] bg-[#141413] text-white shadow-pill"
+                  : "border-[#EBE7DF] bg-[#FAF8F4] text-[#57544E] hover:bg-[#F3F1EC]",
               )}
             >
               {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}{" "}
-              {counts[f]}
+              <span className="ml-1 opacity-75">{counts[f]}</span>
             </button>
           ))}
         </div>

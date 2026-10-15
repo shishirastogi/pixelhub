@@ -3,7 +3,12 @@ import type { CreateCommentInput } from "@pixelhub/types/contracts/comments";
 import { emit } from "../../activity";
 import { prisma } from "../../db";
 import { AppError } from "../../errors";
-import { ALL_ROLES, EDITORS, requireRole } from "../../auth/permissions";
+import {
+  ALL_ROLES,
+  EDITORS,
+  authorizeProject,
+  requireRole,
+} from "../../auth/permissions";
 import * as repo from "./repo";
 import * as taskRepo from "../tasks/repo";
 
@@ -73,12 +78,40 @@ export async function listVersionComments(userId: string, versionId: string) {
   return buildThread(rows);
 }
 
+export async function listFileComments(userId: string, fileId: string) {
+  const file = await repo.findFile(fileId);
+  if (!file) throw AppError.notFound("File");
+
+  const membership = await requireRole(userId, file.projectId, ALL_ROLES);
+  if (!membership.canViewFiles) {
+    throw AppError.forbidden(
+      "FILE_VIEW_RESTRICTED",
+      "File viewing is restricted for your role",
+    );
+  }
+
+  const rows = await repo.findCommentsForFile(fileId);
+  return buildThread(rows);
+}
+
+export async function listProjectComments(userId: string, idOrSlug: string) {
+  const { project } = await authorizeProject(userId, idOrSlug, ALL_ROLES);
+  const rows = await repo.findCommentsForProject(project.id);
+  return buildThread(rows);
+}
+
 export async function createComment(
   userId: string,
   input: CreateCommentInput,
 ) {
   const projectId = await resolveTargetProject(input);
-  await requireRole(userId, projectId, ALL_ROLES);
+  const membership = await requireRole(userId, projectId, ALL_ROLES);
+  if (!membership.canComment) {
+    throw AppError.forbidden(
+      "COMMENT_RESTRICTED",
+      "Commenting is restricted for your role on this project",
+    );
+  }
 
   if (input.parentCommentId) {
     const parent = await repo.findParentComment(input.parentCommentId);

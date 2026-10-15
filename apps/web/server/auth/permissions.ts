@@ -15,6 +15,11 @@ export interface Membership {
   projectId: string;
   userId: string;
   role: Role;
+  canViewFiles: boolean;
+  canDownloadFiles: boolean;
+  canViewBrief: boolean;
+  canComment: boolean;
+  canApproveVersions: boolean;
 }
 
 const UUID_RE =
@@ -46,7 +51,17 @@ export async function getMembership(
     where: { projectId_userId: { projectId, userId } },
   });
   if (!member) return null;
-  return { projectId: member.projectId, userId: member.userId, role: member.role };
+  const isStaff = member.role !== Role.CLIENT;
+  return {
+    projectId: member.projectId,
+    userId: member.userId,
+    role: member.role,
+    canViewFiles: isStaff ? true : member.canViewFiles,
+    canDownloadFiles: isStaff ? true : member.canDownloadFiles,
+    canViewBrief: isStaff ? true : member.canViewBrief,
+    canComment: isStaff ? true : member.canComment,
+    canApproveVersions: isStaff ? true : member.canApproveVersions,
+  };
 }
 
 export async function requireRole(

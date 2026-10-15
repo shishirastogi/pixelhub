@@ -12,7 +12,11 @@ export default async function VersionsPage({
   params: { slug: string };
 }) {
   const user = await requireCurrentUser();
-  const { project } = await authorizeProject(user.id, params.slug, ALL_ROLES);
+  const { project, membership } = await authorizeProject(
+    user.id,
+    params.slug,
+    ALL_ROLES,
+  );
 
   const branches = await listBranches(user.id, params.slug);
   const defaultBranch =
@@ -27,6 +31,10 @@ export default async function VersionsPage({
     <VersionsTab
       projectId={project.id}
       projectSlug={project.slug}
+      isClient={membership.role === "CLIENT"}
+      canApproveVersions={membership.canApproveVersions}
+      canComment={membership.canComment}
+      canDownload={membership.canDownloadFiles}
       initialBranches={branches.map((branch) => ({
         id: branch.id,
         name: branch.name,

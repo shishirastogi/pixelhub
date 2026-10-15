@@ -151,46 +151,66 @@ export default function RequirementCard({
   }
 
   const deliverables = detail?.deliverables ?? requirement.deliverables;
+  const isFulfilled =
+    requirement.status === "FULFILLED" || (total > 0 && satisfied >= total);
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#EBE7DF] bg-[#FAF8F4]/70 p-4 transition hover:border-[#D5CFC2] hover:bg-white">
       <button
         type="button"
-        className="flex w-full items-start justify-between gap-3 text-left"
+        className="flex w-full items-center justify-between gap-3 text-left"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-neutral-800">
-              {requirement.title}
-            </span>
-            <Badge tone={STATUS_TONE[requirement.status] ?? "neutral"}>
-              {requirement.status}
-            </Badge>
-            <Badge tone={PRIORITY_TONE[requirement.priority] ?? "neutral"}>
-              {requirement.priority}
-            </Badge>
-            {overdue ? <Badge tone="danger">OVERDUE</Badge> : null}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span
+            className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
+              isFulfilled
+                ? "bg-[#9FE830] text-[#141413]"
+                : "bg-[#EFECE6] text-[#9A968C]"
+            }`}
+          >
+            {isFulfilled ? "✓" : "−"}
+          </span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#141413] text-xs font-semibold text-white shadow-sm">
+            ×{requirement.quantity}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-[#141413]">
+                {requirement.title}
+              </span>
+              <Badge tone={STATUS_TONE[requirement.status] ?? "neutral"}>
+                {requirement.status}
+              </Badge>
+              <Badge tone={PRIORITY_TONE[requirement.priority] ?? "neutral"}>
+                {requirement.priority}
+              </Badge>
+              {overdue ? <Badge tone="danger">OVERDUE</Badge> : null}
+            </div>
+            <p className="mt-0.5 text-xs text-[#6B6860]">
+              {requirement.source === "AI_EXTRACTED" ? "AI-extracted · " : ""}
+              {deliverables.length} deliverable
+              {deliverables.length === 1 ? "" : "s"}
+              {requirement.dueDate
+                ? ` · due ${formatDate(requirement.dueDate)}`
+                : ""}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-neutral-500">
-            {requirement.source === "AI_EXTRACTED" ? "AI-extracted · " : ""}
-            Qty {requirement.quantity}
-            {requirement.dueDate
-              ? ` · due ${formatDate(requirement.dueDate)}`
-              : ""}
-          </p>
         </div>
-        <div className="w-32 shrink-0">
-          <div className="mb-1 text-right text-xs text-neutral-500">
-            {satisfied}/{total} satisfied
+        <div className="w-36 shrink-0">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="text-[#6B6860]">Matched</span>
+            <span className="font-semibold text-[#6D28D9]">
+              {satisfied}/{total}
+            </span>
           </div>
           <ProgressBar
             value={total > 0 ? (satisfied / total) * 100 : 0}
-            tone={total > 0 && satisfied === total ? "emerald" : "rose"}
+            tone={total > 0 && satisfied === total ? "lime" : "violet"}
           />
         </div>
-        <span className="mt-0.5 text-neutral-400">{expanded ? "▾" : "▸"}</span>
+        <span className="ml-1 text-[#6B6860]">{expanded ? "▾" : "▸"}</span>
       </button>
 
       {expanded ? (
@@ -212,27 +232,43 @@ export default function RequirementCard({
                 No deliverables yet — add one so files can auto-match.
               </p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {deliverables.map((deliverable) => (
                   <li
                     key={deliverable.id}
                     className="flex flex-wrap items-center gap-2 text-sm"
                   >
-                    <Badge
-                      tone={
-                        deliverable.status === "SATISFIED"
-                          ? "success"
-                          : "neutral"
+                    <button
+                      type="button"
+                      disabled={actionBusy}
+                      title="Click to toggle deliverable status"
+                      onClick={() =>
+                        void withAction(async () => {
+                          await apiFetch(`/deliverables/${deliverable.id}`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                              status:
+                                deliverable.status === "SATISFIED"
+                                  ? "OPEN"
+                                  : "SATISFIED",
+                            }),
+                          });
+                        })
                       }
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-md text-xs font-bold transition ${
+                        deliverable.status === "SATISFIED"
+                          ? "bg-[#9FE830] text-[#141413]"
+                          : "bg-[#EFECE6] text-[#6B6860] hover:bg-[#DFD9CC]"
+                      }`}
                     >
                       {deliverable.status === "SATISFIED" ? "✓" : "○"}
-                    </Badge>
-                    <span className="font-medium text-neutral-700">
+                    </button>
+                    <span className="font-medium text-[#141413]">
                       {deliverable.name}
                     </span>
                     {"filePatterns" in deliverable &&
                     Array.isArray(deliverable.filePatterns) ? (
-                      <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
+                      <code className="rounded bg-[#EFECE6] px-1.5 py-0.5 text-xs text-[#57544E]">
                         {deliverable.filePatterns.join(", ")}
                       </code>
                     ) : null}

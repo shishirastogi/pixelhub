@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import mime from "mime-types";
-import type { Project } from "@prisma/client";
+import sharp from "sharp";
+import type { Prisma, Project } from "@prisma/client";
 import type { FileKind } from "@pixelhub/types";
 import type {
   ConfirmFileInput,
@@ -10,11 +11,63 @@ import type {
 } from "@pixelhub/types/contracts/files";
 import { emit } from "../../activity";
 import { AppError } from "../../errors";
-import { blobKey, presignGet, presignPut } from "../../storage";
+import { blobKey, getObjectBuffer, presignGet, presignPut } from "../../storage";
 import { ALL_ROLES, EDITORS, requireRole } from "../../auth/permissions";
-import { matchFile } from "../requirements/matcher";
+import { matchFile, recomputeRequirementStatus } from "../requirements/matcher";
 import { enqueueAiJob } from "../ai/queue";
 import * as repo from "./repo";
+
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "tiff"]);
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  return (
+    "#" +
+    [clamp(r), clamp(g), clamp(b)]
+      .map((n) => n.toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase()
+  );
+}
+
+async function analyzeImageFile(
+  fileId: string,
+  storageKey: string,
+  extension: string,
+): Promise<void> {
+  if (!IMAGE_EXTS.has(extension.toLowerCase())) return;
+  try {
+    const buffer = await getObjectBuffer(storageKey);
+    if (!buffer) return;
+    const image = sharp(buffer);
+    const [metadata, stats] = await Promise.all([
+      image.metadata(),
+      image.stats(),
+    ]);
+    const colors = new Set<string>();
+    if (stats.dominant) {
+      colors.add(rgbToHex(stats.dominant.r, stats.dominant.g, stats.dominant.b));
+    }
+    if (stats.channels.length >= 3) {
+      colors.add(
+        rgbToHex(
+          stats.channels[0]!.mean,
+          stats.channels[1]!.mean,
+          stats.channels[2]!.mean,
+        ),
+      );
+    }
+    const imageMeta: Prisma.InputJsonValue = {
+      width: metadata.width ?? null,
+      height: metadata.height ?? null,
+      format: metadata.format ?? extension.toLowerCase(),
+      dominantColors: [...colors],
+    };
+    await repo.updateFileImageMeta(fileId, imageMeta);
+  } catch {
+    // Non-blocking if blob is not yet in storage or not a decodable raster image
+  }
+}
 
 export interface FileActor {
   userId: string | null;
@@ -129,6 +182,10 @@ export async function ingestFiles(
       if (!existing) continue;
 
       await repo.softDeleteFile(existing.id);
+      const affectedReqs = await repo.detachFileFromDeliverables(existing.id);
+      for (const reqId of affectedReqs) {
+        await recomputeRequirementStatus(reqId);
+      }
       await emit({
         projectId: project.id,
         actorId: actor.userId,
@@ -204,6 +261,8 @@ export async function confirmFile(
     kind,
   });
 
+  await analyzeImageFile(file.id, file.storageKey, file.extension);
+
   const brandKit = await repo.findBrandKit(project.id);
   if (brandKit && (kind === "EXPORT" || kind === "DELIVERABLE")) {
     await enqueueAiJob({
@@ -249,7 +308,13 @@ export async function getFile(userId: string, fileId: string) {
   const file = await repo.findFileDetailById(fileId);
   if (!file || file.deletedAt) throw AppError.notFound("File");
 
-  await requireRole(userId, file.projectId, ALL_ROLES);
+  const membership = await requireRole(userId, file.projectId, ALL_ROLES);
+  if (!membership.canViewFiles) {
+    throw AppError.forbidden(
+      "FILE_VIEW_RESTRICTED",
+      "File viewing is restricted by the project owner",
+    );
+  }
 
   const { requirementLinks, brandCheckResults, ...rest } = file;
   return {
@@ -270,6 +335,10 @@ export async function deleteFile(userId: string, fileId: string) {
 
   await requireRole(userId, file.projectId, EDITORS);
   await repo.softDeleteFile(file.id);
+  const affectedReqs = await repo.detachFileFromDeliverables(file.id);
+  for (const reqId of affectedReqs) {
+    await recomputeRequirementStatus(reqId);
+  }
 
   await emit({
     projectId: file.projectId,
@@ -287,7 +356,13 @@ export async function getDownloadUrl(userId: string, fileId: string) {
   const file = await repo.findFileById(fileId);
   if (!file || file.deletedAt) throw AppError.notFound("File");
 
-  await requireRole(userId, file.projectId, ALL_ROLES);
+  const membership = await requireRole(userId, file.projectId, ALL_ROLES);
+  if (!membership.canDownloadFiles) {
+    throw AppError.forbidden(
+      "FILE_DOWNLOAD_RESTRICTED",
+      "File downloads are restricted for your role on this project",
+    );
+  }
   const url = await presignGet(file.storageKey);
   return { url };
 }

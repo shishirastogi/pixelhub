@@ -6,8 +6,18 @@ export function findProjectsForUser(userId: string) {
     where: { deletedAt: null, members: { some: { userId } } },
     include: {
       defaultBranch: { select: { id: true, name: true, slug: true, kind: true } },
-      members: { where: { userId }, select: { role: true } },
-      _count: { select: { files: true, requirements: true } },
+      members: {
+        where: { userId },
+        select: {
+          role: true,
+          canViewFiles: true,
+          canDownloadFiles: true,
+          canViewBrief: true,
+          canComment: true,
+          canApproveVersions: true,
+        },
+      },
+      _count: { select: { files: true, requirements: true, members: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -19,6 +29,21 @@ export function findProjectDetail(id: string) {
     include: {
       defaultBranch: { include: { headVersion: true } },
       brandKit: { select: { id: true, name: true } },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              accountType: true,
+              company: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { joinedAt: "asc" },
+      },
       _count: {
         select: { branches: true, files: true, requirements: true, tasks: true },
       },

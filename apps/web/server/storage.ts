@@ -56,3 +56,16 @@ export async function presignGet(key: string, expiresIn = 900): Promise<string> 
     expiresIn,
   });
 }
+
+export async function getObjectBuffer(key: string): Promise<Buffer | null> {
+  try {
+    const res = await s3().send(
+      new GetObjectCommand({ Bucket: bucket(), Key: key }),
+    );
+    if (!res.Body) return null;
+    const bytes = await res.Body.transformToByteArray();
+    return Buffer.from(bytes);
+  } catch {
+    return null;
+  }
+}

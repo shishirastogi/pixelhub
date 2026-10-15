@@ -130,7 +130,22 @@ export async function updateBranch(
 ) {
   const branch = await repo.findBranch(branchId);
   if (!branch || branch.deletedAt) throw AppError.notFound("Branch");
-  await requireRole(userId, branch.projectId, EDITORS);
+
+  const onlyApproving =
+    input.status === "APPROVED" &&
+    input.name === undefined &&
+    input.slug === undefined;
+  if (onlyApproving) {
+    const membership = await requireRole(userId, branch.projectId, ALL_ROLES);
+    if (!membership.canApproveVersions) {
+      throw AppError.forbidden(
+        "APPROVAL_RESTRICTED",
+        "Version approval is not enabled for your role on this project",
+      );
+    }
+  } else {
+    await requireRole(userId, branch.projectId, EDITORS);
+  }
 
   const data: Prisma.BranchUncheckedUpdateInput = {};
   if (input.name !== undefined) data.name = input.name.trim();

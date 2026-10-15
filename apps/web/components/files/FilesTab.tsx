@@ -76,6 +76,9 @@ export default function FilesTab({
   branches,
   defaultBranchId,
   devices: initialDevices,
+  isClient = false,
+  canDownload = true,
+  canComment = true,
 }: {
   projectId: string;
   projectSlug: string;
@@ -84,12 +87,16 @@ export default function FilesTab({
   branches: BranchOption[];
   defaultBranchId: string | null;
   devices: WatcherDeviceInfo[];
+  isClient?: boolean;
+  canDownload?: boolean;
+  canComment?: boolean;
 }) {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>(initialFiles);
   const [nextCursor, setNextCursor] = useState<string | null>(
     initialNextCursor,
   );
+  const [viewMode, setViewMode] = useState<"GALLERY" | "TABLE">("GALLERY");
   const [kind, setKind] = useState<string>("ALL");
   const [branchId, setBranchId] = useState<string>(defaultBranchId ?? "");
   const [q, setQ] = useState("");
@@ -204,128 +211,261 @@ export default function FilesTab({
             ))}
           </Select>
         </div>
-        <UploadButton
-          ref={uploadRef}
-          projectId={projectId}
-          onUploaded={handleUploaded}
-        />
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-full border border-[#EBE7DF] bg-white p-1 shadow-pill">
+            <button
+              type="button"
+              onClick={() => setViewMode("GALLERY")}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition",
+                viewMode === "GALLERY"
+                  ? "bg-[#141413] text-white"
+                  : "text-[#6B6860] hover:text-[#141413]",
+              )}
+            >
+              ⊞ Visual Gallery
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("TABLE")}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition",
+                viewMode === "TABLE"
+                  ? "bg-[#141413] text-white"
+                  : "text-[#6B6860] hover:text-[#141413]",
+              )}
+            >
+              ☰ Table
+            </button>
+          </div>
+          {!isClient ? (
+            <UploadButton
+              ref={uploadRef}
+              projectId={projectId}
+              onUploaded={handleUploaded}
+            />
+          ) : null}
+        </div>
       </div>
 
-      <WatcherPill
-        projectId={projectId}
-        projectSlug={projectSlug}
-        devices={watchers}
-        onRefresh={refreshWatchers}
-      />
+      {!isClient ? (
+        <WatcherPill
+          projectId={projectId}
+          projectSlug={projectSlug}
+          devices={watchers}
+          onRefresh={refreshWatchers}
+        />
+      ) : null}
 
       {error ? <ErrorText>{error}</ErrorText> : null}
 
       <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <CardTitle>Files</CardTitle>
-          <span className="text-xs text-neutral-400">
-            {files.length} file{files.length === 1 ? "" : "s"}
-            {loading ? " · loading…" : ""}
-          </span>
+        <div className="mb-4 flex items-center justify-between">
+          <CardTitle>
+            {isClient
+              ? "Shared Project Deliverables & Assets"
+              : "Tracked Project Assets"}
+          </CardTitle>
+          <Badge tone="neutral">
+            {files.length} file{files.length === 1 ? "" : "s"} · click any asset
+            to preview & review
+          </Badge>
         </div>
 
         {files.length === 0 ? (
           <EmptyState
-            title="No files yet"
-            description="Upload files, or pair your project folder with the watcher to auto-track them."
+            title="No files in this branch yet"
+            description={
+              isClient
+                ? "The studio has not uploaded exports to this branch yet."
+                : "Upload files above, drag-and-drop exports below, or pair your local project folder with pixelhub-watch."
+            }
           />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-100 text-xs text-neutral-400">
-                  <th className="px-2 py-2 font-medium">Name</th>
-                  <th className="px-2 py-2 font-medium">Path</th>
-                  <th className="px-2 py-2 font-medium">Kind</th>
-                  <th className="px-2 py-2 font-medium">Size</th>
-                  <th className="px-2 py-2 font-medium">Links</th>
-                  <th className="px-2 py-2 font-medium">Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((file) => (
-                  <tr
-                    key={file.id}
-                    className={cn(
-                      "border-b border-neutral-50 transition hover:bg-neutral-50",
-                      "cursor-pointer",
-                    )}
-                    onClick={() => setSelectedId(file.id)}
-                  >
-                    <td className="px-2 py-2">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded bg-neutral-100 font-mono text-[10px] uppercase text-neutral-500">
-                          {file.extension.slice(0, 4)}
-                        </span>
-                        <span className="font-medium text-neutral-800">
-                          {file.fileName}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-neutral-500">{file.path}</td>
-                    <td className="px-2 py-2">
+        ) : viewMode === "GALLERY" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {files.map((file) => {
+              const hasLinks = (file.linkedRequirementCount ?? 0) > 0;
+              return (
+                <div
+                  key={file.id}
+                  onClick={() => setSelectedId(file.id)}
+                  className="group flex cursor-pointer flex-col justify-between overflow-hidden rounded-[22px] border border-[#EBE7DF] bg-[#FAF8F4] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#141413]/30 hover:bg-white hover:shadow-card"
+                >
+                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#141413]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/v1/files/${file.id}/preview`}
+                      alt={file.fileName}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute left-3 top-3 flex items-center gap-1.5">
                       <Badge tone={KIND_TONE[file.kind] ?? "neutral"}>
                         {file.kind}
                       </Badge>
-                    </td>
-                    <td className="px-2 py-2 text-neutral-500">
-                      {formatBytes(file.sizeBytes)}
-                    </td>
-                    <td className="px-2 py-2 text-neutral-500">
-                      {file.linkedRequirementCount ?? 0}
-                    </td>
-                    <td className="px-2 py-2 text-neutral-500">
-                      {timeAgo(file.createdAt)}
-                    </td>
-                  </tr>
-                ))}
+                      {hasLinks ? (
+                        <Badge tone="lime">
+                          ✓ {file.linkedRequirementCount} matched
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#141413]">
+                          {file.fileName}
+                        </p>
+                        <p className="truncate font-mono text-[11px] text-[#6B6860]">
+                          {file.path}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[11px] font-medium text-[#6B6860]">
+                        {formatBytes(file.sizeBytes)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-[#EBE7DF] pt-2.5 text-xs">
+                      <span className="text-[#6B6860]">
+                        {timeAgo(file.createdAt)}
+                      </span>
+                      <span className="font-semibold text-[#6D28D9] group-hover:underline">
+                        Preview & Review →
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="rounded-xl bg-[#F4F2ED] text-[#57544E]">
+                  <th className="rounded-l-xl px-3.5 py-2.5 font-medium">
+                    Asset / Preview
+                  </th>
+                  <th className="px-3 py-2.5 font-medium">Relative Path</th>
+                  <th className="px-3 py-2.5 font-medium">Status / Kind</th>
+                  <th className="px-3 py-2.5 font-medium">Size</th>
+                  <th className="px-3 py-2.5 font-medium">Matched Specs</th>
+                  <th className="rounded-r-xl px-3.5 py-2.5 text-right font-medium">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F4F2ED]">
+                {files.map((file) => {
+                  const hasLinks = (file.linkedRequirementCount ?? 0) > 0;
+                  return (
+                    <tr
+                      key={file.id}
+                      className="cursor-pointer transition hover:bg-[#FAF8F4]"
+                      onClick={() => setSelectedId(file.id)}
+                    >
+                      <td className="px-3.5 py-3">
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={cn(
+                              "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold",
+                              hasLinks
+                                ? "bg-[#9FE830] text-[#141413]"
+                                : "bg-[#F3F1EC] text-[#9A968C]",
+                            )}
+                          >
+                            {hasLinks ? "✓" : "−"}
+                          </span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/v1/files/${file.id}/preview`}
+                            alt={file.fileName}
+                            className="h-10 w-10 shrink-0 rounded-xl border border-[#EBE7DF] bg-[#141413] object-cover"
+                          />
+                          <span className="font-semibold text-[#141413]">
+                            {file.fileName}
+                          </span>
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-[11px] text-[#6B6860]">
+                        {file.path}
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge tone={KIND_TONE[file.kind] ?? "neutral"}>
+                          {file.kind}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3 font-medium text-[#141413]">
+                        {formatBytes(file.sizeBytes)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {hasLinks ? (
+                          <Badge tone="lime">
+                            {file.linkedRequirementCount} linked
+                          </Badge>
+                        ) : (
+                          <span className="text-[#9A968C]">0 linked</span>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-semibold text-[#6D28D9]">
+                        Preview & Review →
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
         {nextCursor ? (
-          <div className="mt-3 flex justify-center">
+          <div className="mt-4 flex justify-center">
             <Button
               variant="secondary"
               size="sm"
               disabled={loading}
               onClick={() => fetchFiles({ cursor: nextCursor, append: true })}
             >
-              Load more
+              Load more assets
             </Button>
           </div>
         ) : null}
       </Card>
 
-      <div
-        className={cn(
-          "rounded-xl border border-dashed px-4 py-6 text-center text-sm transition",
-          dragOver
-            ? "border-rose-300 bg-rose-50/50 text-rose-700"
-            : "border-neutral-300 bg-white text-neutral-500",
-        )}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-      >
-        Drag files here, or use the Upload button. Uploaded files land in
-        `exports/` so the matcher can link them to deliverables automatically.
-      </div>
+      {!isClient ? (
+        <div
+          className={cn(
+            "rounded-[24px] border-2 border-dashed px-6 py-8 text-center text-xs transition",
+            dragOver
+              ? "border-[#7C3AED] bg-[#F3EEFF] text-[#6D28D9]"
+              : "border-[#DFD9CC] bg-white text-[#6B6860] hover:border-[#141413]/30",
+          )}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+        >
+          <p className="font-serif text-lg text-[#141413]">
+            Drop exports here to auto-match deliverables
+          </p>
+          <p className="mt-1">
+            Uploaded files land in <code className="font-mono">exports/</code>{" "}
+            so the deterministic glob matcher can link them to requirements
+            automatically.
+          </p>
+        </div>
+      ) : null}
 
       <FileDetailModal
         key={selectedId ?? "none"}
         fileId={selectedId}
         projectId={projectId}
         projectSlug={projectSlug}
+        isClient={isClient}
+        canDownload={canDownload}
+        canComment={canComment}
         onClose={() => setSelectedId(null)}
         onChanged={() => {
           fetchFiles();

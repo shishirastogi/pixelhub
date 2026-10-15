@@ -17,7 +17,11 @@ import {
   requireRole,
 } from "../../auth/permissions";
 import { enqueueAiJob } from "../ai/queue";
-import { recomputeRequirementStatus, rematchDeliverables } from "./matcher";
+import {
+  matchesPattern,
+  recomputeRequirementStatus,
+  rematchDeliverables,
+} from "./matcher";
 import * as repo from "./repo";
 
 export interface Coverage {
@@ -106,6 +110,12 @@ export async function createRequirement(
 
     return created;
   });
+
+  if (requirement.deliverables.length > 0) {
+    await rematchDeliverables(project.id);
+    const refreshed = await loadRequirementOrThrow(requirement.id);
+    return { ...refreshed, coverage: coverageOf(refreshed.deliverables) };
+  }
 
   return { ...requirement, coverage: coverageOf(requirement.deliverables) };
 }
@@ -252,6 +262,31 @@ export async function linkFile(
     confidence: input.confidence ?? null,
   });
 
+  if (link.linkType === "SATISFIES") {
+    const alreadySatisfied = requirement.deliverables.some(
+      (d) => d.satisfiedByFileId === input.fileId && d.status === "SATISFIED",
+    );
+    if (!alreadySatisfied) {
+      const openDeliverables = requirement.deliverables.filter(
+        (d) => d.status !== "SATISFIED",
+      );
+      const patternMatched = openDeliverables.find((d) =>
+        d.filePatterns.some((p) => matchesPattern(file.fileName, p)),
+      );
+      const targetDeliverable = patternMatched ?? openDeliverables[0];
+      if (targetDeliverable) {
+        await repo.satisfyDeliverable(targetDeliverable.id, input.fileId);
+      } else if (requirement.deliverables.length === 0) {
+        const createdDeliv = await repo.createDeliverable({
+          requirementId,
+          name: file.fileName,
+          filePatterns: [file.fileName],
+        });
+        await repo.satisfyDeliverable(createdDeliv.id, input.fileId);
+      }
+    }
+  }
+
   await recomputeRequirementStatus(requirementId);
   await emit({
     projectId: requirement.projectId,
@@ -273,6 +308,7 @@ export async function unlinkFile(
   const requirement = await loadRequirementOrThrow(requirementId);
   await requireRole(userId, requirement.projectId, EDITORS);
 
+  await repo.unsatisfyDeliverablesByFile(requirementId, fileId);
   await repo.deleteFileLink(requirementId, fileId);
   await recomputeRequirementStatus(requirementId);
   await emit({
@@ -300,6 +336,9 @@ export async function createDeliverable(
     name: input.name,
     filePatterns: input.filePatterns,
   });
+
+  await rematchDeliverables(requirement.projectId);
+  await recomputeRequirementStatus(requirementId);
 
   await emit({
     projectId: requirement.projectId,

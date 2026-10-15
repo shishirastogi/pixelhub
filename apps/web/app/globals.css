@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,5 +9,50 @@
 }
 
 body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+  @apply bg-[#EAE5DC] font-sans text-[#141413] antialiased selection:bg-[#9FE830]/40 selection:text-[#141413];
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(20, 20, 19, 0.14);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(20, 20, 19, 0.26);
+}
+
+@layer utilities {
+  .bg-golden-hero {
+    background:
+      radial-gradient(120% 100% at 88% 12%, rgba(235, 174, 52, 0.72) 0%, rgba(245, 203, 105, 0.25) 48%, rgba(255, 250, 236, 0) 75%),
+      radial-gradient(90% 90% at 15% 20%, rgba(248, 214, 122, 0.65) 0%, rgba(255, 252, 242, 0.2) 60%),
+      linear-gradient(135deg, #F6DC93 0%, #FDF8E7 48%, #F3C862 100%);
+  }
+
+  .bg-ai-sky {
+    background:
+      radial-gradient(100% 100% at 0% 0%, rgba(186, 219, 255, 0.75) 0%, rgba(226, 240, 255, 0.35) 55%, rgba(255, 255, 255, 0.9) 100%),
+      linear-gradient(145deg, #D9EBFF 0%, #EDF5FF 52%, #F8FBFF 100%);
+  }
+
+  .bg-sidebar-warm {
+    background: linear-gradient(180deg, #EFECE6 0%, #E7E1D5 55%, #DFD8CA 100%);
+  }
+
+  .bg-ambient-dune {
+    background:
+      radial-gradient(80% 60% at 85% 45%, rgba(245, 190, 75, 0.32) 0%, transparent 65%),
+      radial-gradient(70% 60% at 15% 20%, rgba(165, 152, 136, 0.25) 0%, transparent 60%),
+      linear-gradient(180deg, #DDD6C7 0%, #E8E1D3 48%, #D8CFC0 100%);
+  }
 }

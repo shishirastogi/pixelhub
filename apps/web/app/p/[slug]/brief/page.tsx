@@ -3,6 +3,8 @@ import { ALL_ROLES, authorizeProject } from "@/server/auth/permissions";
 import { getBrief } from "@/server/modules/briefs/service";
 import { listRequirements } from "@/server/modules/requirements/service";
 import BriefTab from "@/components/brief/BriefTab";
+import { Card } from "@/components/ui";
+import { EmptyState } from "@/components/form";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,22 @@ export default async function BriefPage({
   params: { slug: string };
 }) {
   const user = await requireCurrentUser();
-  const { project } = await authorizeProject(user.id, params.slug, ALL_ROLES);
+  const { project, membership } = await authorizeProject(
+    user.id,
+    params.slug,
+    ALL_ROLES,
+  );
+
+  if (!membership.canViewBrief) {
+    return (
+      <Card>
+        <EmptyState
+          title="Brief viewing is restricted for your role"
+          description="The project owner has restricted access to the full brief document. You can still view overall deliverable progress on the Dashboard."
+        />
+      </Card>
+    );
+  }
 
   const [brief, requirements] = await Promise.all([
     getBrief(user.id, params.slug),

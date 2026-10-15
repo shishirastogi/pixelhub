@@ -100,6 +100,27 @@ export default function TasksTab({
     setTasks(list);
   }, [projectId]);
 
+  async function updateChecklist(
+    task: TaskItem,
+    checklist: Array<{ text: string; done: boolean }>,
+  ) {
+    setBusyId(task.id);
+    setError(null);
+    try {
+      await apiFetch(`/tasks/${task.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ checklist }),
+      });
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update checklist",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function setStatus(task: TaskItem, status: string) {
     setBusyId(task.id);
     setError(null);
@@ -187,10 +208,10 @@ export default function TasksTab({
               type="button"
               onClick={() => setFilter(f)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition",
+                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
                 filter === f
-                  ? "border-rose-200 bg-rose-50 text-rose-700"
-                  : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50",
+                  ? "border-[#141413] bg-[#141413] text-white shadow-pill"
+                  : "border-[#EBE7DF] bg-[#FAF8F4] text-[#57544E] hover:bg-[#F3F1EC]",
               )}
             >
               {STATUS_LABEL[f] ?? "All"} {counts[f] ?? 0}
@@ -225,11 +246,13 @@ export default function TasksTab({
               return (
                 <div
                   key={column}
-                  className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-3"
+                  className="rounded-2xl border border-[#EBE7DF] bg-[#FAF8F4] p-3.5"
                 >
-                  <p className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-neutral-500">
+                  <p className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#57544E]">
                     {STATUS_LABEL[column]}
-                    <span className="text-neutral-400">{items.length}</span>
+                    <Badge tone={column === "DONE" ? "lime" : "neutral"}>
+                      {items.length}
+                    </Badge>
                   </p>
                   <div className="space-y-2">
                     {items.length === 0 ? (
@@ -243,6 +266,9 @@ export default function TasksTab({
                           task={task}
                           busy={busyId === task.id}
                           onStatus={(status) => void setStatus(task, status)}
+                          onChecklistChange={(next) =>
+                            void updateChecklist(task, next)
+                          }
                         />
                       ))
                     )}
@@ -259,6 +285,7 @@ export default function TasksTab({
                 task={task}
                 busy={busyId === task.id}
                 onStatus={(status) => void setStatus(task, status)}
+                onChecklistChange={(next) => void updateChecklist(task, next)}
               />
             ))}
           </div>
@@ -347,12 +374,15 @@ function TaskCard({
   task,
   busy,
   onStatus,
+  onChecklistChange,
 }: {
   task: TaskItem;
   busy: boolean;
   onStatus: (status: string) => void;
+  onChecklistChange: (next: Array<{ text: string; done: boolean }>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [newStep, setNewStep] = useState("");
   const checklist = checklistOf(task.checklistJson);
   const overdue =
     task.dueDate !== null &&
@@ -406,32 +436,67 @@ function TaskCard({
           ) : null}
 
           {checklist.length > 0 ? (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1.5 text-xs">
               {checklist.map((item, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "inline-flex h-4 w-4 items-center justify-center rounded border",
-                      item.done
-                        ? "border-emerald-300 bg-emerald-100 text-emerald-700"
-                        : "border-neutral-300 bg-white text-transparent",
-                    )}
+                <li key={index}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      const next = checklist.map((entry, i) =>
+                        i === index ? { ...entry, done: !entry.done } : entry,
+                      );
+                      onChecklistChange(next);
+                    }}
+                    className="flex w-full items-center gap-2 text-left transition hover:opacity-80"
                   >
-                    ✓
-                  </span>
-                  <span
-                    className={cn(
-                      item.done
-                        ? "text-neutral-400 line-through"
-                        : "text-neutral-700",
-                    )}
-                  >
-                    {item.text}
-                  </span>
+                    <span
+                      className={cn(
+                        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold",
+                        item.done
+                          ? "border-[#9FE830] bg-[#9FE830] text-[#141413]"
+                          : "border-[#D5CFC2] bg-white text-transparent",
+                      )}
+                    >
+                      ✓
+                    </span>
+                    <span
+                      className={cn(
+                        item.done
+                          ? "text-[#9A968C] line-through"
+                          : "text-[#141413]",
+                      )}
+                    >
+                      {item.text}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
           ) : null}
+
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={newStep}
+              onChange={(e) => setNewStep(e.target.value)}
+              placeholder="Add checklist item…"
+              className="py-1.5 text-xs"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy || !newStep.trim()}
+              onClick={() => {
+                onChecklistChange([
+                  ...checklist,
+                  { text: newStep.trim(), done: false },
+                ]);
+                setNewStep("");
+              }}
+            >
+              + Step
+            </Button>
+          </div>
 
           <div className="flex flex-wrap gap-1.5">
             {task.status === "TODO" ? (

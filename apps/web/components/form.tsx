@@ -7,21 +7,24 @@ import type {
 } from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "violet" | "lime";
 type Size = "sm" | "md";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-rose-600 text-white hover:bg-rose-700 disabled:bg-rose-300",
+    "bg-[#141413] text-white shadow-pill hover:bg-[#2A2927] disabled:bg-[#141413]/40",
   secondary:
-    "border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100",
-  ghost: "text-neutral-600 hover:bg-neutral-100",
-  danger: "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50",
+    "border border-[#E6E1D6] bg-white text-[#141413] shadow-pill hover:bg-[#F7F5F0]",
+  ghost: "text-[#6B6860] hover:bg-[#F3F1EC] hover:text-[#141413]",
+  danger:
+    "border border-rose-200 bg-[#FEECEB]/60 text-rose-700 hover:bg-[#FEECEB]",
+  violet: "bg-[#7C3AED] text-white shadow-pill hover:bg-[#6D28D9]",
+  lime: "bg-[#9FE830] text-[#141413] font-semibold shadow-pill hover:bg-[#92DC25]",
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-3.5 py-2 text-sm",
+  sm: "px-3 py-1.5 text-xs",
+  md: "px-4 py-2 text-sm",
 };
 
 export function Button({
@@ -36,7 +39,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-60",
         VARIANTS[variant],
         SIZES[size],
         className,
@@ -56,7 +59,7 @@ export function Label({
   return (
     <label
       htmlFor={htmlFor}
-      className="mb-1 block text-sm font-medium text-neutral-700"
+      className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[#6B6860]"
     >
       {children}
     </label>
@@ -64,7 +67,7 @@ export function Label({
 }
 
 const FIELD_CLASSES =
-  "w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none transition focus:border-rose-500 disabled:bg-neutral-50";
+  "w-full rounded-xl border border-[#E6E1D6] bg-[#FCFBF9] px-3.5 py-2.5 text-sm text-[#141413] placeholder:text-[#9A968C] outline-none transition focus:border-[#7C3AED] focus:bg-white focus:ring-2 focus:ring-[#7C3AED]/15 disabled:bg-[#F3F1EC]";
 
 export function Input({
   className,
@@ -100,14 +103,18 @@ export function Field({
     <div>
       <Label>{label}</Label>
       {children}
-      {hint ? <p className="mt-1 text-xs text-neutral-500">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-[#6B6860]">{hint}</p> : null}
     </div>
   );
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
-  return <p className="text-sm text-rose-600">{children}</p>;
+  return (
+    <p className="rounded-xl border border-rose-200 bg-[#FEECEB]/60 px-3 py-2 text-xs font-medium text-rose-700">
+      {children}
+    </p>
+  );
 }
 
 export function EmptyState({
@@ -120,10 +127,12 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center">
-      <p className="font-medium text-neutral-700">{title}</p>
+    <div className="rounded-2xl border border-dashed border-[#DFD9CC] bg-[#FAF8F4] p-8 text-center">
+      <p className="font-serif text-xl text-[#141413]">{title}</p>
       {description ? (
-        <p className="mt-1 text-sm text-neutral-500">{description}</p>
+        <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-[#6B6860]">
+          {description}
+        </p>
       ) : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
+import { Button, ErrorText, Field, Input, Textarea } from "@/components/form";
 
 interface CreatedProject {
   slug: string;
@@ -46,88 +47,75 @@ export function NewProjectForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div>
-        <label className="mb-1 block text-sm font-medium" htmlFor="name">
-          Project name
-        </label>
-        <input
+      <Field label="Project Name">
+        <Input
           id="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           placeholder="Acme Q4 Campaign"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-rose-500"
         />
-      </div>
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="client">
-            Client
-          </label>
-          <input
+        <Field label="Client">
+          <Input
             id="client"
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
             placeholder="Acme Corp"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-rose-500"
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="deadline">
-            Deadline
-          </label>
-          <input
+        </Field>
+        <Field label="Deadline">
+          <Input
             id="deadline"
             type="date"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-rose-500"
           />
-        </div>
+        </Field>
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium" htmlFor="brief">
-          Brief (optional)
-        </label>
-        <textarea
+      <Field
+        label="Client Brief (Optional)"
+        hint="Paste the client brief here — you can extract requirements with AI anytime."
+      >
+        <Textarea
           id="brief"
           value={briefText}
           onChange={(e) => setBriefText(e.target.value)}
-          rows={6}
-          placeholder="Paste the client brief here — you can extract requirements with AI later."
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-rose-500"
+          rows={5}
+          placeholder="Paste goals, deliverables, file patterns, and brand guidelines…"
         />
+      </Field>
+
+      <div className="flex flex-wrap gap-6 rounded-2xl bg-[#FAF8F4] p-4">
+        <label className="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-[#141413]">
+          <input
+            type="checkbox"
+            checked={aiEnabled}
+            onChange={(e) => setAiEnabled(e.target.checked)}
+            className="h-4 w-4 accent-[#141413]"
+          />
+          <span>Enable AI assistant & extraction</span>
+        </label>
+
+        <label className="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-[#141413]">
+          <input
+            type="checkbox"
+            checked={createExperimentalBranch}
+            onChange={(e) => setCreateExperimentalBranch(e.target.checked)}
+            className="h-4 w-4 accent-[#141413]"
+          />
+          <span>Create an “Experimental” branch</span>
+        </label>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={aiEnabled}
-          onChange={(e) => setAiEnabled(e.target.checked)}
-        />
-        Enable AI features
-      </label>
+      {error ? <ErrorText>{error}</ErrorText> : null}
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={createExperimentalBranch}
-          onChange={(e) => setCreateExperimentalBranch(e.target.checked)}
-        />
-        Create an “Experimental” branch
-      </label>
-
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:opacity-60"
-      >
-        {busy ? "Creating…" : "Create project"}
-      </button>
+      <Button type="submit" disabled={busy} className="w-full py-3">
+        {busy ? "Creating Workspace…" : "Create Project Workspace →"}
+      </Button>
     </form>
   );
 }
